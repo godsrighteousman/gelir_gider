@@ -120,7 +120,8 @@ class UserProvider extends ChangeNotifier {
     );
 
     // Kullanıcı bilgilerini kaydet
-    await prefs.setString('currentUser', jsonEncode(_currentUser!.toJson()));
+    await prefs.setString(
+        'currentUser', jsonEncode(_currentUser!.toJson())); //grdegstdegs
     await prefs.setBool('isLoggedIn', true);
 
     // Firebase'e kullanıcı kaydet
@@ -636,7 +637,7 @@ class _KashiAppState extends State<KashiApp> {
               theme: ThemeData.light(),
               darkTheme: _buildLightDarkTheme(),
               themeMode: themeProvider.themeMode,
-              home: const LoginPage(),
+              home: const SplashScreen(),
             );
           },
         ),
@@ -725,6 +726,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   int? _salaryDay;
   String _selectedFilter = 'Tümü';
   String _selectedSort = 'Tarih';
+  StreamSubscription<QuerySnapshot>? _expensesSubscription;
 
   @override
   void initState() {
@@ -732,22 +734,53 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _expensesSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     try {
+      print('🔄 Veri yükleme başlatılıyor...');
+
+      // Kullanıcı bilgisini yükle
       await _userProvider.loadUser();
-      await _loadUserSettingsFromFirebase(); // Firebase'den kullanıcı ayarlarını yükle
+      print('✅ Kullanıcı bilgisi yüklendi');
 
-      // Tema ayarını Firebase'den yükle
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      await themeProvider.loadThemeFromFirebase();
-
+      // Önce harcama geçmişini yükle
       await _loadExpenses();
-      await _loadBudget();
-      await _loadSalaryDay();
+      print('✅ Harcama geçmişi yüklendi');
+
+      // Diğer Firebase işlemlerini paralel yap
+      await Future.wait([
+        _loadUserSettingsFromFirebase(),
+        _loadBudget(),
+        _loadSalaryDay(),
+      ], eagerError: false)
+          .catchError((e) {
+        print('⚠️ Bazı Firebase işlemleri başarısız: $e');
+      });
+
+      // Tema ayarını yükle
+      try {
+        final themeProvider =
+            Provider.of<ThemeProvider>(context, listen: false);
+        await themeProvider.loadThemeFromFirebase();
+      } catch (e) {
+        print('⚠️ Tema yükleme hatası: $e');
+      }
+
+      // Harcama istatistiklerini güncelle
+      await _updateExpenseCount();
+      print('✅ Harcama istatistikleri güncellendi');
+
+      // Real-time listener başlat (geçici olarak devre dışı)
+      // _startExpensesListener();
 
       if (mounted) {
         setState(() {
-          // UI'yi yenile
+          print('✅ UI güncellendi');
         });
       }
     } catch (e) {
@@ -789,6 +822,25 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         if (data['salaryDay'] != null) {
           _salaryDay = data['salaryDay'] as int;
           print('✅ Maaş günü Firebase\'den yüklendi: $_salaryDay');
+        }
+
+        // Harcama istatistiklerini yükle
+        if (data['expenseCount'] != null) {
+          final expenseCount = data['expenseCount'] as int;
+          print('✅ Harcama sayısı Firebase\'den yüklendi: $expenseCount');
+        }
+
+        if (data['totalSpent'] != null) {
+          final totalSpent = (data['totalSpent'] as num).toDouble();
+          print(
+              '✅ Toplam harcama Firebase\'den yüklendi: ${totalSpent.toStringAsFixed(2)}₺');
+        }
+
+        if (data['categoryTotals'] != null) {
+          final categoryTotals =
+              Map<String, double>.from(data['categoryTotals'] as Map);
+          print(
+              '✅ Kategori toplamları Firebase\'den yüklendi: $categoryTotals');
         }
 
         print('✅ Kullanıcı ayarları Firebase\'den yüklendi');
@@ -856,7 +908,10 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
   // Firebase'den harcamaları yükle
   Future<void> _loadExpensesFromFirebase() async {
-    if (_userProvider.currentUser == null) return;
+    if (_userProvider.currentUser == null) {
+      print('⚠️ Kullanıcı bilgisi yok, Firebase yükleme atlanıyor');
+      return;
+    }
 
     try {
       final firestore = FirebaseFirestore.instance;
@@ -864,17 +919,18 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
       print('🔍 Kişisel harcamalar Firebase\'den yükleniyor: $userId');
 
+      // Timeout ekle - index hatası için orderBy'ı kaldırdık
       final expensesQuery = await firestore
           .collection('userExpenses')
           .where('userId', isEqualTo: userId)
           .where('type', isEqualTo: 'personal')
-          .orderBy('date', descending: true)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() {
           _expenses.clear();
-          _expenses.addAll(expensesQuery.docs.map((doc) {
+          final expenses = expensesQuery.docs.map((doc) {
             final data = doc.data();
             return Expense(
               amount: (data['amount'] as num).toDouble(),
@@ -882,13 +938,87 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
               note: data['note'] as String?,
             );
-          }));
+          }).toList();
+
+          // Tarihe göre sırala (en yeni önce)
+          expenses.sort((a, b) => b.date.compareTo(a.date));
+          _expenses.addAll(expenses);
         });
       }
 
       print('✅ ${_expenses.length} kişisel harcama Firebase\'den yüklendi');
+
+      // Başarılı yükleme sonrası local storage'ı güncelle
+      await _saveExpenses();
     } catch (e) {
       print('❌ Firebase harcama yükleme hatası: $e');
+      // Hata durumunda local storage'dan yüklemeyi dene
+      await _loadExpensesFromLocal();
+    }
+  }
+
+  // Local storage'dan harcamaları yükle (yedek yöntem)
+  Future<void> _loadExpensesFromLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = _userProvider.currentUser?.id ?? 'default';
+      final expensesString = prefs.getString('expenses_$userId');
+
+      if (expensesString != null) {
+        final expensesJson = jsonDecode(expensesString) as List;
+        if (mounted) {
+          setState(() {
+            _expenses.clear();
+            _expenses.addAll(expensesJson.map((e) => Expense(
+                  amount: e['amount'].toDouble(),
+                  category: e['category'],
+                  date: DateTime.parse(e['date']),
+                  note: e['note'],
+                )));
+          });
+        }
+        print('✅ ${_expenses.length} harcama local storage\'dan yüklendi');
+      } else {
+        print('ℹ️ Local storage\'da da harcama verisi yok');
+      }
+    } catch (e) {
+      print('❌ Local storage harcama yükleme hatası: $e');
+    }
+  }
+
+  // Real-time harcama listener'ı başlat
+  void _startExpensesListener() {
+    if (_userProvider.currentUser == null) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final userId = _userProvider.currentUser!.id;
+
+      _expensesSubscription = firestore
+          .collection('userExpenses')
+          .where('userId', isEqualTo: userId)
+          .where('type', isEqualTo: 'personal')
+          .orderBy('date', descending: true)
+          .snapshots()
+          .listen((snapshot) {
+        if (mounted) {
+          setState(() {
+            _expenses.clear();
+            _expenses.addAll(snapshot.docs.map((doc) {
+              final data = doc.data();
+              return Expense(
+                amount: (data['amount'] as num).toDouble(),
+                category: data['category'] as String? ?? 'Diğer',
+                date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                note: data['note'] as String?,
+              );
+            }));
+          });
+        }
+        print('🔄 Real-time güncelleme: ${_expenses.length} harcama');
+      });
+    } catch (e) {
+      print('❌ Real-time listener başlatma hatası: $e');
     }
   }
 
@@ -920,29 +1050,12 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
       // Eğer Firebase'de veri yoksa local storage'dan yükle
       if (_expenses.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        final userId = _userProvider.currentUser?.id ?? 'default';
-        final expensesString = prefs.getString('expenses_$userId');
-        if (expensesString != null) {
-          final expensesJson = jsonDecode(expensesString) as List;
-          if (mounted) {
-            setState(() {
-              _expenses.clear();
-              _expenses.addAll(expensesJson.map((e) => Expense(
-                    amount: e['amount'].toDouble(),
-                    category: e['category'],
-                    date: DateTime.parse(e['date']),
-                    note: e['note'],
-                  )));
-            });
-          }
-          print('✅ ${_expenses.length} harcama local storage\'dan yüklendi');
-        } else {
-          print('ℹ️ Henüz harcama verisi yok');
-        }
+        await _loadExpensesFromLocal();
       }
     } catch (e) {
       print('❌ Harcama yükleme hatası: $e');
+      // Hata durumunda local storage'dan yüklemeyi dene
+      await _loadExpensesFromLocal();
     }
   }
 
@@ -993,21 +1106,12 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   }
 
   Future<void> _addExpense(Expense expense) async {
+    // UI'yi hemen güncelle
     setState(() {
       _expenses.add(expense);
     });
 
-    // Harcamaları kaydet ve UI'yi güncelle
-    await _saveExpenses();
-    await _saveExpenseToFirebase(expense); // Firebase'e de kaydet
-
-    // UI'yi yeniden yükle
-    if (mounted) {
-      setState(() {
-        // State zaten güncellenmiş durumda, sadece UI'yi yenile
-      });
-    }
-
+    // SnackBar'ı hemen göster
     if (mounted) {
       try {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1022,6 +1126,40 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         );
       } catch (e) {
         print('❌ SnackBar gösterme hatası: $e');
+      }
+    }
+
+    // Arka planda kaydetme işlemlerini yap
+    _saveExpenseInBackground(expense);
+  }
+
+  // Arka planda harcama kaydetme
+  Future<void> _saveExpenseInBackground(Expense expense) async {
+    try {
+      print('🔄 Harcama arka planda kaydediliyor...');
+
+      // Local storage'a kaydet
+      await _saveExpenses();
+      print('✅ Local storage kaydedildi');
+
+      // Firebase'e kaydet
+      await _saveExpenseToFirebase(expense);
+      print('✅ Firebase kaydedildi');
+
+      // Harcama sayısını güncelle
+      await _updateExpenseCount();
+      print('✅ Harcama sayısı güncellendi');
+    } catch (e) {
+      print('❌ Arka plan kaydetme hatası: $e');
+      // Hata durumunda kullanıcıya bilgi ver
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Harcama kaydedilirken hata oluştu: $e'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -1041,13 +1179,18 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
           ),
           ElevatedButton(
             onPressed: () async {
+              // UI'yi hemen güncelle
               setState(() {
                 _expenses.removeAt(index);
               });
-              await _saveExpenses();
+
+              // Dialog'u kapat
               if (mounted) {
                 Navigator.pop(context);
               }
+
+              // Arka planda silme işlemlerini yap
+              _removeExpenseInBackground(expense);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sil'),
@@ -1057,9 +1200,105 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     );
   }
 
+  // Arka planda harcama silme
+  Future<void> _removeExpenseInBackground(Expense expense) async {
+    try {
+      print('🔄 Harcama arka planda siliniyor...');
+
+      // Local storage'dan sil
+      await _saveExpenses();
+      print('✅ Local storage güncellendi');
+
+      // Firebase'den sil
+      await _removeExpenseFromFirebase(expense);
+      print('✅ Firebase\'den silindi');
+
+      // Harcama sayısını güncelle
+      await _updateExpenseCount();
+      print('✅ Harcama sayısı güncellendi');
+    } catch (e) {
+      print('❌ Arka plan silme hatası: $e');
+      // Hata durumunda kullanıcıya bilgi ver
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Harcama silinirken hata oluştu: $e'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  // Firebase'den harcama sil
+  Future<void> _removeExpenseFromFirebase(Expense expense) async {
+    if (_userProvider.currentUser == null) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final userId = _userProvider.currentUser!.id;
+
+      // Aynı harcamayı bul ve sil
+      final query = await firestore
+          .collection('userExpenses')
+          .where('userId', isEqualTo: userId)
+          .where('type', isEqualTo: 'personal')
+          .where('amount', isEqualTo: expense.amount)
+          .where('category', isEqualTo: expense.category)
+          .where('note', isEqualTo: expense.note)
+          .get();
+
+      for (var doc in query.docs) {
+        await doc.reference.delete();
+      }
+
+      print(
+          '✅ Harcama Firebase\'den silindi: ${expense.note ?? expense.category}');
+    } catch (e) {
+      print('❌ Firebase harcama silme hatası: $e');
+    }
+  }
+
+  // Harcama sayısını güncelle
+  Future<void> _updateExpenseCount() async {
+    if (_userProvider.currentUser == null) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final userId = _userProvider.currentUser!.id;
+
+      // Harcama istatistiklerini hesapla
+      final totalSpent =
+          _expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final categoryTotals = <String, double>{};
+
+      for (final expense in _expenses) {
+        categoryTotals[expense.category] =
+            (categoryTotals[expense.category] ?? 0.0) + expense.amount;
+      }
+
+      // Kullanıcı ayarlarında harcama bilgilerini güncelle
+      await firestore.collection('userSettings').doc(userId).update({
+        'expenseCount': _expenses.length,
+        'lastExpenseUpdate': FieldValue.serverTimestamp(),
+        'totalSpent': totalSpent,
+        'categoryTotals': categoryTotals,
+        'lastExpenseDate': _expenses.isNotEmpty
+            ? _expenses.first.date.toIso8601String()
+            : null,
+      });
+
+      print(
+          '✅ Harcama istatistikleri güncellendi: ${_expenses.length} harcama, ${totalSpent.toStringAsFixed(2)}₺ toplam');
+    } catch (e) {
+      print('❌ Harcama sayısı güncelleme hatası: $e');
+    }
+  }
+
   double get _remainingBudget {
     if (_totalBudget == null) return 0;
-    double spent = _expenses.fold(0, (sum, e) => sum + e.amount);
+    double spent = _expenses.fold(0.0, (sum, e) => sum + e.amount);
     return _totalBudget! - spent;
   }
 
@@ -1589,39 +1828,177 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
             // İstatistik kartları
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Bugün',
-                      '₺${toplamGunluk.toStringAsFixed(2)}',
-                      Icons.today,
-                      Colors.blue,
-                    ),
+                  // Harcama geçmişi istatistikleri
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Toplam Harcama',
+                          '₺${_expenses.fold<double>(0.0, (sum, e) => sum + e.amount).toStringAsFixed(2)}',
+                          Icons.account_balance_wallet,
+                          Colors.purple,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Harcama Sayısı',
+                          '${_expenses.length}',
+                          Icons.receipt_long,
+                          Colors.indigo,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Kategori Sayısı',
+                          '${_expenses.map((e) => e.category).toSet().length}',
+                          Icons.category,
+                          Colors.teal,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Bu Hafta',
-                      '₺${toplamHaftalik.toStringAsFixed(2)}',
-                      Icons.view_week,
-                      Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Bu Ay',
-                      '₺${toplamAylik.toStringAsFixed(2)}',
-                      Icons.calendar_month,
-                      Colors.green,
-                    ),
+                  const SizedBox(height: 12),
+                  // Zaman bazlı istatistikler
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Bugün',
+                          '₺${toplamGunluk.toStringAsFixed(2)}',
+                          Icons.today,
+                          Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Bu Hafta',
+                          '₺${toplamHaftalik.toStringAsFixed(2)}',
+                          Icons.view_week,
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Bu Ay',
+                          '₺${toplamAylik.toStringAsFixed(2)}',
+                          Icons.calendar_month,
+                          Colors.green,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
+
+            // Kategori dağılımı
+            if (_categoryTotals.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kategori Dağılımı',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 120,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _categoryTotals.length,
+                        itemBuilder: (context, index) {
+                          final category =
+                              _categoryTotals.keys.elementAt(index);
+                          final amount = _categoryTotals[category]!;
+                          final total = _expenses.fold<double>(
+                              0.0, (sum, e) => sum + e.amount);
+                          final percentage =
+                              total > 0 ? (amount / total * 100) : 0.0;
+
+                          return Container(
+                            width: 120,
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: kategoriRenkleri[category] ??
+                                            Colors.grey,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        category,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '₺${amount.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: kategoriRenkleri[category] ??
+                                        Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  '${percentage.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Filtre ve sıralama
             Container(
@@ -4979,6 +5356,578 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
       ),
     );
   }
+}
+
+// Sade Başlangıç Sayfası
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue[500]!,
+              Colors.purple[500]!,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Logo
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(60),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  size: 60,
+                  color: Colors.white,
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // Uygulama adı
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: const Text(
+                  '💰 KASHI 💰',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Alt başlık
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Text(
+                  '🚀 Akıllı Harcama Takip Uygulaması',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 60),
+
+              // Başla butonu
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                          builder: (context) => const IntroPage()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 50, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  child: const Text(
+                    '🎯 BAŞLA',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Alt bilgi
+              Text(
+                'Finansal hedeflerinize ulaşın! 💪',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.8),
+                  fontWeight: FontWeight.w400,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Uygulama Tanıtım Sayfası
+class IntroPage extends StatefulWidget {
+  const IntroPage({Key? key}) : super(key: key);
+
+  @override
+  State<IntroPage> createState() => _IntroPageState();
+}
+
+class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late AnimationController _slideController;
+
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  final List<IntroSlide> _slides = [
+    IntroSlide(
+      title: '💰 Akıllı Harcama Takibi',
+      description:
+          'Her kuruşunuzu takip edin! Günlük, haftalık ve aylık harcamalarınızı kategorilere göre organize edin. Artık paranızın nereye gittiğini tam olarak bileceksiniz! 📊',
+      icon: Icons.account_balance_wallet,
+      color: Colors.blue,
+      gradient: LinearGradient(
+        colors: [Colors.blue[400]!, Colors.blue[700]!],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    IntroSlide(
+      title: '👥 Arkadaşlarla Kolay Paylaşım',
+      description:
+          'Ortak harcamaları unutun! Arkadaşlarınızla harcamaları paylaşın, borç-alacak durumlarını otomatik hesaplayın. Artık kim kime ne borçlu karışıklığı yok! 🤝',
+      icon: Icons.people,
+      color: Colors.green,
+      gradient: LinearGradient(
+        colors: [Colors.green[400]!, Colors.green[700]!],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    IntroSlide(
+      title: '📈 Profesyonel Bütçe Yönetimi',
+      description:
+          'Finansal hedeflerinize ulaşın! Aylık bütçenizi belirleyin, kalan bütçenizi takip edin. Maaş gününüzü ayarlayın ve tasarruf etmeye başlayın! 🎯',
+      icon: Icons.pie_chart,
+      color: Colors.orange,
+      gradient: LinearGradient(
+        colors: [Colors.orange[400]!, Colors.orange[700]!],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    IntroSlide(
+      title: '⚡ Gerçek Zamanlı Senkronizasyon',
+      description:
+          'Verileriniz her yerde! Firebase ile güvenle saklanır, tüm cihazlarınızda anında senkronize olur. Telefon, tablet, bilgisayar - hepsinde aynı veriler! 🔄',
+      icon: Icons.sync,
+      color: Colors.purple,
+      gradient: LinearGradient(
+        colors: [Colors.purple[400]!, Colors.purple[700]!],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Animasyon controller'ları başlat
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 700),
+      vsync: this,
+    );
+
+    // Animasyonları tanımla
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // İlk animasyonları başlat
+    _startAnimations();
+  }
+
+  void _startAnimations() {
+    _fadeController.forward();
+    _scaleController.forward();
+    _slideController.forward();
+  }
+
+  void _resetAnimations() {
+    _fadeController.reset();
+    _scaleController.reset();
+    _slideController.reset();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _fadeController.dispose();
+    _scaleController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // PageView
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                  // Sayfa değiştiğinde animasyonları yeniden başlat
+                  _resetAnimations();
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    _startAnimations();
+                  });
+                },
+                itemCount: _slides.length,
+                itemBuilder: (context, index) {
+                  return _buildSlide(_slides[index]);
+                },
+              ),
+            ),
+
+            // Alt kısım
+            Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Sayfa göstergeleri
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      _slides.length,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _currentPage == index ? 24 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _currentPage == index
+                              ? Colors.blue[600]
+                              : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: _currentPage == index
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.blue[600]!.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Butonlar
+                  Row(
+                    children: [
+                      // Atlama butonu
+                      if (_currentPage < _slides.length - 1)
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                    builder: (context) => const LoginPage()),
+                              );
+                            },
+                            child: Text(
+                              'Atla',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // İleri/Giriş butonu
+                      Expanded(
+                        flex: 2,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (_currentPage < _slides.length - 1) {
+                                _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              } else {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                      builder: (context) => const LoginPage()),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[600],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation:
+                                  _currentPage < _slides.length - 1 ? 4 : 8,
+                              shadowColor: Colors.blue[600]!.withOpacity(0.3),
+                            ),
+                            child: Text(
+                              _currentPage < _slides.length - 1
+                                  ? 'İleri'
+                                  : 'Başla',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlide(IntroSlide slide) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.lightBlue[50]!,
+            Colors.lightBlue[100]!,
+            Colors.white,
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+          // İkon - Scale animasyonu
+          AnimatedBuilder(
+            animation: _scaleAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    gradient: slide.gradient,
+                    borderRadius: BorderRadius.circular(70),
+                    boxShadow: [
+                      BoxShadow(
+                        color: slide.color.withOpacity(0.4),
+                        blurRadius: 25,
+                        offset: const Offset(0, 15),
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    slide.icon,
+                    size: 70,
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 40),
+
+          // Başlık - Slide animasyonu
+          SlideTransition(
+            position: _slideAnimation,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: slide.gradient,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: slide.color.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  slide.title,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Açıklama - Fade animasyonu
+          FadeTransition(
+            opacity: _fadeAnimation,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Text(
+                slide.description,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[700],
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Tanıtım slide modeli
+class IntroSlide {
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final LinearGradient gradient;
+
+  IntroSlide({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.gradient,
+  });
 }
 
 void main() async {
