@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "953294102600",
+    "project_id": "kashi-802e8",
+    "storage_bucket": "kashi-802e8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:953294102600:android:97e551d766c7629cfe387d",
+        "android_client_info": {
+          "package_name": "com.example.my_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnUzdRV4iPtxnXM5WAtLObw97bTGq_iDI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
