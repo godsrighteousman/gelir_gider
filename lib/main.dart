@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'firebase_options.dart';
 import 'dart:async' show Stream;
 
@@ -28,6 +30,40 @@ class User {
         username: json['username'],
         createdAt: DateTime.parse(json['createdAt']),
       );
+}
+
+// Dil provider'ı
+class LanguageProvider extends ChangeNotifier {
+  Locale _locale = const Locale('tr'); // Varsayılan Türkçe
+
+  Locale get locale => _locale;
+
+  // Dil tercihini yükle
+  Future<void> loadLanguagePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final languageCode = prefs.getString('language_code') ?? 'tr';
+      _locale = Locale(languageCode);
+      notifyListeners();
+    } catch (e) {
+      print('Dil tercihi yükleme hatası: $e');
+    }
+  }
+
+  // Dil tercihini kaydet
+  Future<void> setLocale(Locale locale) async {
+    try {
+      _locale = locale;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('language_code', locale.languageCode);
+      notifyListeners();
+    } catch (e) {
+      print('Dil tercihi kaydetme hatası: $e');
+    }
+  }
+
+  bool get isEnglish => _locale.languageCode == 'en';
+  bool get isTurkish => _locale.languageCode == 'tr';
 }
 
 // Tema provider'ı
@@ -260,15 +296,22 @@ class SharedExpense {
 
 // Kategori listesi ve renkleri
 const kategoriRenkleri = {
-  'Yemek': Colors.red,
-  'Ulaşım': Colors.blue,
-  'Giyim': Colors.green,
-  'Eğlence': Colors.purple,
-  'Fatura': Colors.orange,
-  'Diğer': Colors.grey,
+  'food': Colors.red,
+  'transportation': Colors.blue,
+  'clothing': Colors.green,
+  'entertainment': Colors.purple,
+  'bills': Colors.orange,
+  'other': Colors.grey,
 };
 
-const kategoriler = ['Yemek', 'Ulaşım', 'Giyim', 'Eğlence', 'Fatura', 'Diğer'];
+const kategoriler = [
+  'food',
+  'transportation',
+  'clothing',
+  'entertainment',
+  'bills',
+  'other'
+];
 
 // Login sayfası
 class LoginPage extends StatefulWidget {
@@ -289,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _login(dynamic l10n) async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -309,7 +352,7 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Giriş yapılırken hata oluştu: $e'),
+              content: Text('${l10n.login} error: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -326,11 +369,63 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          // Dil seçimi butonu
+          Consumer<LanguageProvider>(
+            builder: (context, languageProvider, child) {
+              return Container(
+                margin: const EdgeInsets.only(right: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: PopupMenuButton<Locale>(
+                  icon: const Icon(
+                    Icons.language,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                  tooltip: l10n.selectLanguage,
+                  onSelected: (Locale locale) {
+                    languageProvider.setLocale(locale);
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<Locale>(
+                      value: const Locale('tr'),
+                      child: Row(
+                        children: [
+                          const Text('🇹🇷 '),
+                          const SizedBox(width: 8),
+                          Text(l10n.turkish),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<Locale>(
+                      value: const Locale('en'),
+                      child: Row(
+                        children: [
+                          const Text('🇺🇸 '),
+                          const SizedBox(width: 8),
+                          Text(l10n.english),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -391,7 +486,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       children: [
                         Text(
-                          'Hoş Geldiniz!',
+                          l10n.welcome,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -400,7 +495,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Kullanıcı adınızı belirleyin',
+                          l10n.setUsername,
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
@@ -412,8 +507,8 @@ class _LoginPageState extends State<LoginPage> {
                         TextFormField(
                           controller: _usernameController,
                           decoration: InputDecoration(
-                            labelText: 'Kullanıcı Adı',
-                            hintText: 'Örn: ahmet',
+                            labelText: l10n.username,
+                            hintText: l10n.usernameHint,
                             prefixIcon: const Icon(Icons.person),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -423,13 +518,13 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Kullanıcı adı gerekli';
+                              return l10n.usernameRequired;
                             }
                             if (value.trim().length < 3) {
-                              return 'Kullanıcı adı en az 3 karakter olmalı';
+                              return l10n.usernameMinLength;
                             }
                             if (value.trim().length > 20) {
-                              return 'Kullanıcı adı en fazla 20 karakter olmalı';
+                              return l10n.usernameMaxLength;
                             }
                             return null;
                           },
@@ -440,7 +535,7 @@ class _LoginPageState extends State<LoginPage> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: _isLoading ? null : () => _login(l10n),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[600],
                               foregroundColor: Colors.white,
@@ -460,9 +555,9 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                     ),
                                   )
-                                : const Text(
-                                    'Giriş Yap',
-                                    style: TextStyle(
+                                : Text(
+                                    l10n.login,
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -490,7 +585,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Kullanıcı adınız belirlendikten sonra otomatik olarak size özel bir ID atanacaktır.',
+                          l10n.idInfo,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.blue[700],
@@ -519,6 +614,7 @@ class KashiApp extends StatefulWidget {
 class _KashiAppState extends State<KashiApp> {
   final UserProvider _userProvider = UserProvider();
   final ThemeProvider _themeProvider = ThemeProvider();
+  final LanguageProvider _languageProvider = LanguageProvider();
   bool _isLoading = true;
   bool _isLoggedIn = false;
 
@@ -568,7 +664,14 @@ class _KashiAppState extends State<KashiApp> {
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Dil tercihini yükle
+    await _languageProvider.loadLanguagePreference();
+    // Login durumunu kontrol et
+    await _checkLoginStatus();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -628,15 +731,27 @@ class _KashiAppState extends State<KashiApp> {
         providers: [
           ChangeNotifierProvider.value(value: _userProvider),
           ChangeNotifierProvider.value(value: _themeProvider),
+          ChangeNotifierProvider.value(value: _languageProvider),
         ],
-        child: Consumer<ThemeProvider>(
-          builder: (context, themeProvider, child) {
+        child: Consumer2<ThemeProvider, LanguageProvider>(
+          builder: (context, themeProvider, languageProvider, child) {
             return MaterialApp(
               title: 'Kashi',
               debugShowCheckedModeBanner: false,
               theme: ThemeData.light(),
               darkTheme: _buildLightDarkTheme(),
               themeMode: themeProvider.themeMode,
+              locale: languageProvider.locale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('tr'),
+                Locale('en'),
+              ],
               home: const SplashScreen(),
             );
           },
@@ -648,15 +763,27 @@ class _KashiAppState extends State<KashiApp> {
       providers: [
         ChangeNotifierProvider.value(value: _userProvider),
         ChangeNotifierProvider.value(value: _themeProvider),
+        ChangeNotifierProvider.value(value: _languageProvider),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
+      child: Consumer2<ThemeProvider, LanguageProvider>(
+        builder: (context, themeProvider, languageProvider, child) {
           return MaterialApp(
             title: 'Kashi',
             debugShowCheckedModeBanner: false,
             theme: ThemeData.light(),
             darkTheme: _buildLightDarkTheme(),
             themeMode: themeProvider.themeMode,
+            locale: languageProvider.locale,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('tr'),
+              Locale('en'),
+            ],
             home: const MainTabScreen(),
           );
         },
@@ -724,8 +851,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   final UserProvider _userProvider = UserProvider();
   double? _totalBudget;
   int? _salaryDay;
-  String _selectedFilter = 'Tümü';
-  String _selectedSort = 'Tarih';
+  String _selectedFilter = 'all';
+  String _selectedSort = 'date';
   StreamSubscription<QuerySnapshot>? _expensesSubscription;
 
   @override
@@ -788,7 +915,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       if (mounted && ScaffoldMessenger.of(context).mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Veri yüklenirken hata oluştu: $e'),
+            content: Text('Data loading error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -934,7 +1061,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
             final data = doc.data();
             return Expense(
               amount: (data['amount'] as num).toDouble(),
-              category: data['category'] as String? ?? 'Diğer',
+              category: data['category'] as String? ?? 'other',
               date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
               note: data['note'] as String?,
             );
@@ -1008,7 +1135,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               final data = doc.data();
               return Expense(
                 amount: (data['amount'] as num).toDouble(),
-                category: data['category'] as String? ?? 'Diğer',
+                category: data['category'] as String? ?? 'other',
                 date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
                 note: data['note'] as String?,
               );
@@ -1117,7 +1244,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '${expense.amount.toStringAsFixed(2)} ₺ ${expense.category} harcaması eklendi!'),
+                '${expense.amount.toStringAsFixed(2)} ₺ ${_getCategoryName(expense.category, context)} harcaması eklendi!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape:
@@ -1155,7 +1282,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Harcama kaydedilirken hata oluştu: $e'),
+            content: Text('Expense save error: $e'),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1165,17 +1292,18 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   }
 
   Future<void> _removeExpense(int index) async {
+    final l10n = AppLocalizations.of(context)!;
     final expense = _expenses[index];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Harcamayı Sil'),
+        title: Text(l10n.deleteExpense),
         content: Text(
-            '${expense.amount.toStringAsFixed(2)} ₺ ${expense.category} harcaması silinecek. Emin misin?'),
+            '${expense.amount.toStringAsFixed(2)} ₺ ${_getCategoryName(expense.category, context)} ${l10n.expenseDeleteConfirm}'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1193,7 +1321,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               _removeExpenseInBackground(expense);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Sil'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -1332,7 +1460,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     final now = DateTime.now();
 
     switch (_selectedFilter) {
-      case 'Bugün':
+      case 'today':
         filtered = _expenses
             .where((e) =>
                 e.date.year == now.year &&
@@ -1340,14 +1468,14 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                 e.date.day == now.day)
             .toList();
         break;
-      case 'Bu Hafta':
+      case 'thisWeek':
         final weekStart = now.subtract(Duration(days: now.weekday - 1));
         filtered = _expenses
             .where((e) =>
                 e.date.isAfter(weekStart.subtract(const Duration(days: 1))))
             .toList();
         break;
-      case 'Bu Ay':
+      case 'thisMonth':
         final monthStart = DateTime(now.year, now.month, 1);
         filtered = _expenses
             .where((e) =>
@@ -1357,13 +1485,13 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     }
 
     switch (_selectedSort) {
-      case 'Tarih':
+      case 'date':
         filtered.sort((a, b) => b.date.compareTo(a.date));
         break;
-      case 'Tutar':
+      case 'amount':
         filtered.sort((a, b) => b.amount.compareTo(a.amount));
         break;
-      case 'Kategori':
+      case 'category':
         filtered.sort((a, b) => a.category.compareTo(b.category));
         break;
     }
@@ -1381,6 +1509,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   }
 
   void _showSalaryDayDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final controller =
         TextEditingController(text: _salaryDay?.toString() ?? '');
     final result = await showDialog<int>(
@@ -1398,13 +1527,13 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               child: Icon(Icons.calendar_today, color: Colors.blue[600]),
             ),
             const SizedBox(width: 12),
-            const Text('Maaş Günü Ayarla'),
+            Text(l10n.setSalaryDay),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Ayın hangi günü maaş alıyorsunuz?'),
+            Text(l10n.salaryDayQuestion),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
@@ -1423,7 +1552,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1436,7 +1565,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               backgroundColor: Colors.blue[600],
               foregroundColor: Colors.white,
             ),
-            child: const Text('Kaydet'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -1450,6 +1579,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   }
 
   void _showBudgetDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final controller =
         TextEditingController(text: _totalBudget?.toStringAsFixed(2) ?? '');
     final result = await showDialog<double>(
@@ -1468,13 +1598,13 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                   Icon(Icons.account_balance_wallet, color: Colors.green[600]),
             ),
             const SizedBox(width: 12),
-            const Text('Bütçe Ayarla'),
+            Text(l10n.budgetQuestion),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Aylık toplam bütçenizi girin'),
+            Text(l10n.budgetQuestion),
             const SizedBox(height: 16),
             TextField(
               controller: controller,
@@ -1494,7 +1624,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1507,7 +1637,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               backgroundColor: Colors.green[600],
               foregroundColor: Colors.white,
             ),
-            child: const Text('Kaydet'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -1522,6 +1652,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     double toplamGunluk = 0;
     double toplamHaftalik = 0;
     double toplamAylik = 0;
@@ -1552,9 +1683,9 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Kashi',
-              style: TextStyle(
+            Text(
+              l10n.appName,
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
               ),
@@ -1579,7 +1710,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
-              tooltip: 'Yenile',
+              tooltip: l10n.refresh,
               onPressed: () async {
                 // Tüm verileri yenile
                 await _loadData();
@@ -1592,7 +1723,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Ana sayfa yenilendi'),
+                      content: Text('${l10n.home} refreshed'),
                       backgroundColor: Colors.blue,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
@@ -1616,8 +1747,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(themeProvider.isDarkMode
-                      ? 'Gece modu açıldı'
-                      : 'Gündüz modu açıldı'),
+                      ? l10n.nightModeOn
+                      : l10n.dayModeOn),
                   backgroundColor: Colors.blue,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
@@ -1696,8 +1827,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                         children: [
                           Text(
                             _salaryDay == null
-                                ? 'Maaş gününü ayarla'
-                                : 'Maaş gününe kalan',
+                                ? l10n.setSalaryDayText
+                                : l10n.daysUntilSalary,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -1707,8 +1838,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                           const SizedBox(height: 4),
                           Text(
                             _salaryDay == null
-                                ? 'Tıkla ve ayarla'
-                                : '$_daysUntilSalary gün',
+                                ? l10n.clickToSetText
+                                : '$_daysUntilSalary ${l10n.daysText}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -1811,8 +1942,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       ),
                     ),
                   ] else ...[
-                    const Text(
-                      'Henüz bütçe girilmedi',
+                    Text(
+                      l10n.noBudgetSetText,
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey,
@@ -2016,12 +2147,17 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _selectedFilter,
-                          items: ['Tümü', 'Bugün', 'Bu Hafta', 'Bu Ay']
-                              .map((filter) => DropdownMenuItem(
-                                    value: filter,
-                                    child: Text(filter),
-                                  ))
-                              .toList(),
+                          items: [
+                            DropdownMenuItem(
+                                value: 'all', child: Text(l10n.all)),
+                            DropdownMenuItem(
+                                value: 'today', child: Text(l10n.today)),
+                            DropdownMenuItem(
+                                value: 'thisWeek', child: Text(l10n.thisWeek)),
+                            DropdownMenuItem(
+                                value: 'thisMonth',
+                                child: Text(l10n.thisMonth)),
+                          ],
                           onChanged: (value) {
                             setState(() {
                               _selectedFilter = value!;
@@ -2043,12 +2179,14 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _selectedSort,
-                          items: ['Tarih', 'Tutar', 'Kategori']
-                              .map((sort) => DropdownMenuItem(
-                                    value: sort,
-                                    child: Text(sort),
-                                  ))
-                              .toList(),
+                          items: [
+                            DropdownMenuItem(
+                                value: 'date', child: Text(l10n.date)),
+                            DropdownMenuItem(
+                                value: 'amount', child: Text(l10n.amount)),
+                            DropdownMenuItem(
+                                value: 'category', child: Text(l10n.category)),
+                          ],
                           onChanged: (value) {
                             setState(() {
                               _selectedSort = value!;
@@ -2211,7 +2349,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Henüz harcama yok',
+                              l10n.noExpensesYet,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -2259,7 +2397,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
           }
         },
         icon: const Icon(Icons.add),
-        label: const Text('Harcama Ekle'),
+        label: Text(l10n.addExpense),
         backgroundColor: Colors.blue[600],
         foregroundColor: Colors.white,
       ),
@@ -2338,7 +2476,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
           children: [
             Expanded(
               child: Text(
-                expense.category,
+                _getCategoryName(expense.category, context),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -2413,35 +2551,56 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Yemek':
+      case 'food':
         return Icons.restaurant;
-      case 'Ulaşım':
+      case 'transportation':
         return Icons.directions_car;
-      case 'Giyim':
+      case 'clothing':
         return Icons.checkroom;
-      case 'Eğlence':
+      case 'entertainment':
         return Icons.movie;
-      case 'Fatura':
+      case 'bills':
         return Icons.receipt;
-      case 'Diğer':
+      case 'other':
         return Icons.more_horiz;
       default:
         return Icons.shopping_cart;
     }
   }
 
+  String _getCategoryName(String category, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (category) {
+      case 'food':
+        return l10n.food;
+      case 'transportation':
+        return l10n.transportation;
+      case 'clothing':
+        return l10n.clothing;
+      case 'entertainment':
+        return l10n.entertainment;
+      case 'bills':
+        return l10n.bills;
+      case 'other':
+        return l10n.other;
+      default:
+        return l10n.other;
+    }
+  }
+
   // Logout işlemi
   Future<void> _logout() async {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Çıkış Yap'),
+        title: Text(l10n.logout),
         content: const Text(
             'Hesabınızdan çıkış yapmak istediğinizden emin misiniz?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -2454,7 +2613,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Çıkış Yap'),
+            child: Text(l10n.logout),
           ),
         ],
       ),
@@ -2531,7 +2690,7 @@ class _FriendsPageState extends State<FriendsPage> {
               id: doc.id,
               amount: (data['amount'] as num).toDouble(),
               description: data['description'] as String,
-              category: data['category'] as String? ?? 'Diğer',
+              category: data['category'] as String? ?? 'other',
               date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
               debtType: data['debtType'] as String,
               createdBy: data['createdBy'] as String? ?? '',
@@ -2595,18 +2754,19 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   void _removeFriend(int index) {
+    final l10n = AppLocalizations.of(context)!;
     final friendToRemove = _friends[index];
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Arkadaşı Sil'),
+        title: Text(l10n.deleteFriend),
         content: Text(
             '${friendToRemove.fullName} arkadaş listenden silinecek. Bu işlem geri alınamaz. Emin misin?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -2639,7 +2799,7 @@ class _FriendsPageState extends State<FriendsPage> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Sil'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -2734,15 +2894,16 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   // Borç durumu açıklaması (Düzeltilmiş mantık)
-  String _getDebtStatusText(Friend friend) {
+  String _getDebtStatusText(Friend friend, BuildContext context) {
     final netDebt = _calculateNetDebtFor(friend);
+    final l10n = AppLocalizations.of(context)!;
 
     if (netDebt > 0) {
       return '${friend.fullName} size ${netDebt.toStringAsFixed(0)}₺ borçlu';
     } else if (netDebt < 0) {
-      return 'Siz ${friend.fullName}\'e ${netDebt.abs().toStringAsFixed(0)}₺ borçlusunuz';
+      return '${l10n.youOweText} ${friend.fullName} ${netDebt.abs().toStringAsFixed(0)}₺';
     } else {
-      return 'Hesap eşit';
+      return l10n.accountsEqual;
     }
   }
 
@@ -2797,6 +2958,7 @@ class _FriendsPageState extends State<FriendsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -2806,8 +2968,8 @@ class _FriendsPageState extends State<FriendsPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Arkadaşlarım',
+            Text(
+              l10n.myFriends,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
@@ -2850,7 +3012,7 @@ class _FriendsPageState extends State<FriendsPage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
-              tooltip: 'Yenile',
+              tooltip: l10n.refresh,
               onPressed: () async {
                 // Tüm verileri yenile
                 await _loadFriendsFromFirebase();
@@ -2864,7 +3026,7 @@ class _FriendsPageState extends State<FriendsPage> {
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Arkadaşlar listesi yenilendi'),
+                      content: Text(l10n.friendsListRefreshed),
                       backgroundColor: Colors.green,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
@@ -2929,7 +3091,7 @@ class _FriendsPageState extends State<FriendsPage> {
           // Arkadaş listesi
           Expanded(
             child: _friends.isEmpty
-                ? _buildEmptyState()
+                ? _buildEmptyState(context)
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _friends.length,
@@ -3094,7 +3256,7 @@ class _FriendsPageState extends State<FriendsPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _getDebtStatusText(friend),
+                        _getDebtStatusText(friend, context),
                         style: TextStyle(
                           fontSize: 11,
                           color: isOwed
@@ -3185,7 +3347,7 @@ class _FriendsPageState extends State<FriendsPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(dynamic l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -3203,8 +3365,8 @@ class _FriendsPageState extends State<FriendsPage> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Henüz arkadaş eklenmemiş',
+          Text(
+            l10n.noFriendsAddedYet,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -3224,7 +3386,7 @@ class _FriendsPageState extends State<FriendsPage> {
           ElevatedButton.icon(
             onPressed: () => _showAddFriendDialog(),
             icon: const Icon(Icons.person_add),
-            label: const Text('İlk Arkadaşını Ekle'),
+            label: Text(l10n.addFirstFriend),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[600],
               foregroundColor: Colors.white,
@@ -3240,6 +3402,7 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   void _showAddFriendDialog() async {
+    final l10n = AppLocalizations.of(context)!;
     final userIdController = TextEditingController();
     String? foundUserName;
     bool isSearching = false;
@@ -3261,7 +3424,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 child: Icon(Icons.person_add, color: Colors.blue[600]),
               ),
               const SizedBox(width: 12),
-              const Text('Arkadaş Ekle'),
+              Text(l10n.addFriend),
             ],
           ),
           content: Column(
@@ -3453,7 +3616,7 @@ class _FriendsPageState extends State<FriendsPage> {
                           color: Colors.red[600], size: 24),
                       const SizedBox(width: 12),
                       Text(
-                        'Kullanıcı bulunamadı',
+                        l10n.userNotFound,
                         style: TextStyle(
                           color: Colors.red[700],
                           fontWeight: FontWeight.bold,
@@ -3467,7 +3630,7 @@ class _FriendsPageState extends State<FriendsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: foundUserName != null
@@ -3490,7 +3653,7 @@ class _FriendsPageState extends State<FriendsPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('Ekle'),
+              child: Text(l10n.add),
             ),
           ],
         ),
@@ -3767,7 +3930,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               id: e['id'],
               amount: e['amount'].toDouble(),
               description: e['description'],
-              category: e['category'] ?? 'Diğer',
+              category: e['category'] ?? 'other',
               date: DateTime.parse(e['date']),
               debtType: e['debtType'],
               createdBy: e['createdBy'] ?? '',
@@ -3799,7 +3962,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
       String finalCategory = expense.category;
       print('🔍 Kaydedilecek kategori: "$finalCategory"');
       if (finalCategory.isEmpty) {
-        finalCategory = 'Diğer';
+        finalCategory = 'other';
         print('🔧 Kategori boş olduğu için "Diğer" olarak ayarlandı');
       } else {
         print('✅ Kategori doğru şekilde kaydedilecek: $finalCategory');
@@ -3980,7 +4143,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               // createdBy ID'sine göre belirle
               String createdById = data['createdBy'] as String? ?? '';
               if (createdById == userId) {
-                createdByName = _userProvider.currentUser?.username ?? 'Ben';
+                createdByName = _userProvider.currentUser?.username ?? 'Me';
               } else if (createdById == friendId) {
                 createdByName = widget.friend.displayName;
               } else {
@@ -4008,7 +4171,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             String category = data['category'] as String? ?? '';
             print('🔍 Firebase\'den gelen kategori: "$category"');
             if (category.isEmpty) {
-              category = 'Diğer';
+              category = 'other';
               print('🔧 Kategori boş olduğu için "Diğer" olarak ayarlandı');
             } else {
               print('✅ Kategori doğru şekilde alındı: $category');
@@ -4073,7 +4236,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
           .snapshots();
 
       _expensesSubscription = sharedExpensesStream.listen((snapshot) {
-        _processExpensesSnapshot(snapshot, 'Ortak harcamalar');
+        _processExpensesSnapshot(snapshot, 'Shared expenses');
       });
 
       print('✅ Gerçek zamanlı dinleme başlatıldı');
@@ -4192,6 +4355,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
   }
 
   void _showAddSharedExpenseDialog() {
+    final l10n = AppLocalizations.of(context)!;
     final amountController = TextEditingController();
     final descriptionController = TextEditingController();
     String selectedDebtType = 'full';
@@ -4214,7 +4378,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                 child: Icon(Icons.receipt_long, color: Colors.green[600]),
               ),
               const SizedBox(width: 12),
-              const Text('Ortak Alışveriş Ekle'),
+              Text(l10n.addSharedExpense),
             ],
           ),
           content: Column(
@@ -4238,8 +4402,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               TextField(
                 controller: descriptionController,
                 decoration: InputDecoration(
-                  labelText: 'Açıklama',
-                  hintText: 'Örn: Market alışverişi',
+                  labelText: l10n.description,
+                  hintText: l10n.descriptionHint,
                   prefixIcon: const Icon(Icons.description),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -4276,7 +4440,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(category),
+                            Text(_getCategoryName(category, context)),
                           ],
                         ),
                       );
@@ -4311,9 +4475,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                     Column(
                       children: [
                         RadioListTile<String>(
-                          title: const Text('Hepsini yansıt'),
-                          subtitle: const Text(
-                              'Tüm tutar karşı tarafa borç olarak yansır'),
+                          title: Text(l10n.fullAmount),
+                          subtitle: Text(l10n.fullAmountDesc),
                           value: 'full',
                           groupValue: selectedDebtType,
                           onChanged: (value) {
@@ -4324,9 +4487,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                           contentPadding: EdgeInsets.zero,
                         ),
                         RadioListTile<String>(
-                          title: const Text('Yarısını yansıt'),
-                          subtitle: const Text(
-                              'Tutarın yarısı karşı tarafa borç olarak yansır'),
+                          title: Text(l10n.halfAmount),
+                          subtitle: Text(l10n.halfAmountDesc),
                           value: 'half',
                           groupValue: selectedDebtType,
                           onChanged: (value) {
@@ -4346,7 +4508,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
+              child: Text(l10n.cancel),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -4410,7 +4572,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('Ekle'),
+              child: Text(l10n.add),
             ),
           ],
         ),
@@ -4426,6 +4588,26 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   // Cache'lenmiş net durum
   double _cachedNetBalance = 0.0;
+
+  String _getCategoryName(String category, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (category) {
+      case 'food':
+        return l10n.food;
+      case 'transportation':
+        return l10n.transportation;
+      case 'clothing':
+        return l10n.clothing;
+      case 'entertainment':
+        return l10n.entertainment;
+      case 'bills':
+        return l10n.bills;
+      case 'other':
+        return l10n.other;
+      default:
+        return l10n.other;
+    }
+  }
 
   // Net durumu Firebase'den yükle
   Future<void> _loadNetBalanceFromFirebase() async {
@@ -4489,6 +4671,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   // Ödeme ekleme fonksiyonu
   void _showPaymentDialog() {
+    final l10n = AppLocalizations.of(context)!;
     final amountController = TextEditingController();
     final noteController = TextEditingController();
 
@@ -4507,7 +4690,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               child: Icon(Icons.payment, color: Colors.green[600]),
             ),
             const SizedBox(width: 12),
-            const Text('Ödeme Ekle'),
+            Text(l10n.addPayment),
           ],
         ),
         content: Column(
@@ -4546,7 +4729,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -4561,7 +4744,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               backgroundColor: Colors.green[600],
               foregroundColor: Colors.white,
             ),
-            child: const Text('Ödeme Ekle'),
+            child: Text(l10n.addPayment),
           ),
         ],
       ),
@@ -4628,6 +4811,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -4663,7 +4847,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
-              tooltip: 'Yenile',
+              tooltip: l10n.refresh,
               onPressed: () async {
                 // Tüm verileri yenile
                 await _loadSharedExpensesFromFirebase();
@@ -4788,7 +4972,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                   ),
                   Expanded(
                     child: _sharedExpenses.isEmpty
-                        ? _buildEmptyExpenseState()
+                        ? _buildEmptyExpenseState(context)
                         : ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: _sharedExpenses.length,
@@ -4932,7 +5116,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        expense.category,
+                        _getCategoryName(expense.category, context),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -5011,7 +5195,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     );
   }
 
-  Widget _buildEmptyExpenseState() {
+  Widget _buildEmptyExpenseState(dynamic l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -5052,7 +5236,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             ElevatedButton.icon(
               onPressed: _showAddSharedExpenseDialog,
               icon: const Icon(Icons.add),
-              label: const Text('İlk Alışverişi Ekle'),
+              label: Text(l10n.addFirstExpense),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green[600],
                 foregroundColor: Colors.white,
@@ -5092,8 +5276,29 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
     super.dispose();
   }
 
+  String _getCategoryName(String category, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (category) {
+      case 'food':
+        return l10n.food;
+      case 'transportation':
+        return l10n.transportation;
+      case 'clothing':
+        return l10n.clothing;
+      case 'entertainment':
+        return l10n.entertainment;
+      case 'bills':
+        return l10n.bills;
+      case 'other':
+        return l10n.other;
+      default:
+        return l10n.other;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
@@ -5211,7 +5416,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(category),
+                                  Text(_getCategoryName(category, context)),
                                 ],
                               ),
                             );
@@ -5310,7 +5515,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text('İptal'),
+                            child: Text(l10n.cancel),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -5342,7 +5547,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text('Ekle'),
+                            child: Text(l10n.add),
                           ),
                         ),
                       ],
@@ -5359,157 +5564,221 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
 }
 
 // Sade Başlangıç Sayfası
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
   @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.blue[500]!,
-              Colors.purple[500]!,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(60),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  size: 60,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Uygulama adı
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: const Text(
-                  '💰 KASHI 💰',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 2,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Alt başlık
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Text(
-                  '🚀 Akıllı Harcama Takip Uygulaması',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 60),
-
-              // Başla butonu
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                          builder: (context) => const IntroPage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 50, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  child: const Text(
-                    '🎯 BAŞLA',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // Alt bilgi
-              Text(
-                'Finansal hedeflerinize ulaşın! 💪',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
-                  fontWeight: FontWeight.w400,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+        body: Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue[500]!,
+            Colors.purple[500]!,
+          ],
         ),
       ),
-    );
+      child: SafeArea(
+        child: Stack(
+          children: [
+            // Dil seçimi butonu - sağ üstte
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Consumer<LanguageProvider>(
+                builder: (context, languageProvider, child) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: PopupMenuButton<Locale>(
+                      icon: const Icon(
+                        Icons.language,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      tooltip: l10n.selectLanguage,
+                      onSelected: (Locale locale) {
+                        languageProvider.setLocale(locale);
+                      },
+                      itemBuilder: (BuildContext context) => [
+                        PopupMenuItem<Locale>(
+                          value: const Locale('tr'),
+                          child: Row(
+                            children: [
+                              const Text('🇹🇷 '),
+                              const SizedBox(width: 8),
+                              Text(l10n.turkish),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<Locale>(
+                          value: const Locale('en'),
+                          child: Row(
+                            children: [
+                              const Text('🇺🇸 '),
+                              const SizedBox(width: 8),
+                              Text(l10n.english),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Ana içerik
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(60),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet,
+                      size: 60,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Uygulama adı
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 15),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '💰 ${l10n.appName} 💰',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Alt başlık
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 25, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(
+                      '🚀 ${l10n.appSubtitle}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                  const SizedBox(height: 60),
+
+                  // Başla butonu
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 50, vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                      ),
+                      child: Text(
+                        '🎯 ${l10n.startButton}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Alt bilgi
+                  Text(
+                    l10n.bottomText,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.8),
+                      fontWeight: FontWeight.w400,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ));
   }
 }
 
-// Uygulama Tanıtım Sayfası
 class IntroPage extends StatefulWidget {
   const IntroPage({Key? key}) : super(key: key);
 
@@ -5793,23 +6062,11 @@ class _IntroPageState extends State<IntroPage> with TickerProviderStateMixin {
   }
 
   Widget _buildSlide(IntroSlide slide) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.lightBlue[50]!,
-            Colors.lightBlue[100]!,
-            Colors.white,
-          ],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           // İkon - Scale animasyonu
           AnimatedBuilder(
             animation: _scaleAnimation,

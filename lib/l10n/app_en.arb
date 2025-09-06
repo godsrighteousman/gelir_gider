@@ -1,0 +1,605 @@
+{
+  "@@locale": "en",
+  "appName": "KASHI",
+  "@appName": {
+    "description": "The name of the application"
+  },
+  "appSubtitle": "Smart Expense Tracking App",
+  "@appSubtitle": {
+    "description": "The subtitle of the application"
+  },
+  "startButton": "START",
+  "@startButton": {
+    "description": "Start button text"
+  },
+  "bottomText": "Reach your financial goals! 💪",
+  "@bottomText": {
+    "description": "Bottom text on splash screen"
+  },
+  "welcome": "Welcome!",
+  "@welcome": {
+    "description": "Welcome message"
+  },
+  "setUsername": "Set your username",
+  "@setUsername": {
+    "description": "Username setting instruction"
+  },
+  "username": "Username",
+  "@username": {
+    "description": "Username label"
+  },
+  "usernameHint": "Ex: john",
+  "@usernameHint": {
+    "description": "Username input hint"
+  },
+  "usernameRequired": "Username is required",
+  "@usernameRequired": {
+    "description": "Username required error"
+  },
+  "usernameMinLength": "Username must be at least 3 characters",
+  "@usernameMinLength": {
+    "description": "Username minimum length error"
+  },
+  "usernameMaxLength": "Username must be at most 20 characters",
+  "@usernameMaxLength": {
+    "description": "Username maximum length error"
+  },
+  "login": "Login",
+  "@login": {
+    "description": "Login button text"
+  },
+  "idInfo": "After setting your username, a unique ID will be automatically assigned to you.",
+  "@idInfo": {
+    "description": "ID information text"
+  },
+  "expenseTrackingApp": "Expense Tracking App",
+  "@expenseTrackingApp": {
+    "description": "Expense tracking app title"
+  },
+  "home": "Home",
+  "@home": {
+    "description": "Home tab"
+  },
+  "friends": "Friends",
+  "@friends": {
+    "description": "Friends tab"
+  },
+  "setSalaryDay": "Set Salary Day",
+  "@setSalaryDay": {
+    "description": "Set salary day button"
+  },
+  "daysUntilSalary": "Days until salary",
+  "@daysUntilSalary": {
+    "description": "Days until salary label"
+  },
+  "clickToSet": "Click to set",
+  "@clickToSet": {
+    "description": "Click to set instruction"
+  },
+  "days": "days",
+  "@days": {
+    "description": "Days unit"
+  },
+  "monthlyBudget": "Monthly Budget",
+  "@monthlyBudget": {
+    "description": "Monthly budget label"
+  },
+  "total": "Total",
+  "@total": {
+    "description": "Total label"
+  },
+  "remaining": "Remaining",
+  "@remaining": {
+    "description": "Remaining label"
+  },
+  "noBudgetSet": "No budget set yet",
+  "@noBudgetSet": {
+    "description": "No budget set message"
+  },
+  "totalExpenses": "Total Expenses",
+  "@totalExpenses": {
+    "description": "Total expenses label"
+  },
+  "expenseCount": "Expense Count",
+  "@expenseCount": {
+    "description": "Expense count label"
+  },
+  "categoryCount": "Category Count",
+  "@categoryCount": {
+    "description": "Category count label"
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Today label"
+  },
+  "thisWeek": "This Week",
+  "@thisWeek": {
+    "description": "This week label"
+  },
+  "thisMonth": "This Month",
+  "@thisMonth": {
+    "description": "This month label"
+  },
+  "categoryDistribution": "Category Distribution",
+  "@categoryDistribution": {
+    "description": "Category distribution label"
+  },
+  "all": "All",
+  "@all": {
+    "description": "All label"
+  },
+  "date": "Date",
+  "@date": {
+    "description": "Date label"
+  },
+  "amount": "Amount",
+  "@amount": {
+    "description": "Amount label"
+  },
+  "category": "Category",
+  "@category": {
+    "description": "Category label"
+  },
+  "expenseHistory": "Expense History",
+  "@expenseHistory": {
+    "description": "Expense history label"
+  },
+  "expenses": "expenses",
+  "@expenses": {
+    "description": "Expenses plural"
+  },
+  "noExpensesYet": "No expenses yet",
+  "@noExpensesYet": {
+    "description": "No expenses message"
+  },
+  "clickToAddFirst": "Click the + button to add\nyour first expense",
+  "@clickToAddFirst": {
+    "description": "Click to add first expense instruction"
+  },
+  "addExpense": "Add Expense",
+  "@addExpense": {
+    "description": "Add expense button"
+  },
+  "deleteExpense": "Delete Expense",
+  "@deleteExpense": {
+    "description": "Delete expense button"
+  },
+  "expenseDeleteConfirm": "expense will be deleted. Are you sure?",
+  "@expenseDeleteConfirm": {
+    "description": "Expense delete confirmation"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button"
+  },
+  "logout": "Logout",
+  "@logout": {
+    "description": "Logout button"
+  },
+  "logoutConfirm": "Are you sure you want to logout from your account?",
+  "@logoutConfirm": {
+    "description": "Logout confirmation"
+  },
+  "salaryDayQuestion": "On which day of the month do you receive your salary?",
+  "@salaryDayQuestion": {
+    "description": "Salary day question"
+  },
+  "dayLabel": "Day (1-31)",
+  "@dayLabel": {
+    "description": "Day label"
+  },
+  "dayHint": "Ex: 15",
+  "@dayHint": {
+    "description": "Day input hint"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+  "budgetQuestion": "Enter your monthly total budget",
+  "@budgetQuestion": {
+    "description": "Budget question"
+  },
+  "budgetLabel": "Budget (₺)",
+  "@budgetLabel": {
+    "description": "Budget label"
+  },
+  "budgetHint": "Ex: 5000.00",
+  "@budgetHint": {
+    "description": "Budget input hint"
+  },
+  "myFriends": "My Friends",
+  "@myFriends": {
+    "description": "My friends label"
+  },
+  "totalFriends": "Total Friends",
+  "@totalFriends": {
+    "description": "Total friends label"
+  },
+  "totalCredit": "Total Credit",
+  "@totalCredit": {
+    "description": "Total credit label"
+  },
+  "totalDebt": "Total Debt",
+  "@totalDebt": {
+    "description": "Total debt label"
+  },
+  "sharedExpenses": "shared expenses",
+  "@sharedExpenses": {
+    "description": "Shared expenses label"
+  },
+  "deleteFriend": "Delete Friend",
+  "@deleteFriend": {
+    "description": "Delete friend button"
+  },
+  "friendDeleteConfirm": "will be removed from friends list. This action cannot be undone. Are you sure?",
+  "@friendDeleteConfirm": {
+    "description": "Friend delete confirmation"
+  },
+  "noFriendsYet": "No friends added yet",
+  "@noFriendsYet": {
+    "description": "No friends message"
+  },
+  "addFriendsToTrack": "Add your friends to track\nshared expenses",
+  "@addFriendsToTrack": {
+    "description": "Add friends instruction"
+  },
+  "addFirstFriend": "Add First Friend",
+  "@addFirstFriend": {
+    "description": "Add first friend button"
+  },
+  "addFriend": "Add Friend",
+  "@addFriend": {
+    "description": "Add friend button"
+  },
+  "yourId": "Your ID:",
+  "@yourId": {
+    "description": "Your ID label"
+  },
+  "friendId": "Friend ID",
+  "@friendId": {
+    "description": "Friend ID label"
+  },
+  "friendIdHint": "Ex: john",
+  "@friendIdHint": {
+    "description": "Friend ID input hint"
+  },
+  "searchingUser": "Searching for user...",
+  "@searchingUser": {
+    "description": "Searching user message"
+  },
+  "userFound": "User found!",
+  "@userFound": {
+    "description": "User found message"
+  },
+  "userNotFound": "User not found",
+  "@userNotFound": {
+    "description": "User not found message"
+  },
+  "add": "Add",
+  "@add": {
+    "description": "Add button"
+  },
+  "addSharedExpense": "Add Shared Expense",
+  "@addSharedExpense": {
+    "description": "Add shared expense button"
+  },
+  "amountLabel": "Amount (₺)",
+  "@amountLabel": {
+    "description": "Amount label"
+  },
+  "amountHint": "Ex: 250.00",
+  "@amountHint": {
+    "description": "Amount input hint"
+  },
+  "description": "Description",
+  "@description": {
+    "description": "Description label"
+  },
+  "descriptionHint": "Ex: Grocery shopping",
+  "@descriptionHint": {
+    "description": "Description input hint"
+  },
+  "selectDebtType": "Select debt type:",
+  "@selectDebtType": {
+    "description": "Select debt type label"
+  },
+  "fullAmount": "Full amount",
+  "@fullAmount": {
+    "description": "Full amount option"
+  },
+  "fullAmountDesc": "Full amount is reflected as debt to the other party",
+  "@fullAmountDesc": {
+    "description": "Full amount description"
+  },
+  "halfAmount": "Half amount",
+  "@halfAmount": {
+    "description": "Half amount option"
+  },
+  "halfAmountDesc": "Half of the amount is reflected as debt to the other party",
+  "@halfAmountDesc": {
+    "description": "Half amount description"
+  },
+  "addPayment": "Add Payment",
+  "@addPayment": {
+    "description": "Add payment button"
+  },
+  "paymentAmount": "Payment Amount (₺)",
+  "@paymentAmount": {
+    "description": "Payment amount label"
+  },
+  "paymentHint": "Ex: 100.00",
+  "@paymentHint": {
+    "description": "Payment input hint"
+  },
+  "noteOptional": "Note (optional)",
+  "@noteOptional": {
+    "description": "Note optional label"
+  },
+  "noteHint": "Ex: Cash payment",
+  "@noteHint": {
+    "description": "Note input hint"
+  },
+  "netBalance": "Net Balance",
+  "@netBalance": {
+    "description": "Net balance label"
+  },
+  "owesYou": "owes you",
+  "@owesYou": {
+    "description": "Owes you text"
+  },
+  "youOwe": "You owe",
+  "@youOwe": {
+    "description": "You owe text"
+  },
+  "accountsEqual": "Accounts are equal",
+  "@accountsEqual": {
+    "description": "Accounts equal message"
+  },
+  "totalShopping": "Total Expenses",
+  "@totalShopping": {
+    "description": "Total shopping label"
+  },
+  "sharedExpense": "Shared expenses",
+  "@sharedExpense": {
+    "description": "Shared expense label"
+  },
+  "shoppingHistory": "Shopping History",
+  "@shoppingHistory": {
+    "description": "Shopping history label"
+  },
+  "noSharedExpenses": "No shared expenses yet",
+  "@noSharedExpenses": {
+    "description": "No shared expenses message"
+  },
+  "addFirstShared": "Add your first shared expense\nwith",
+  "@addFirstShared": {
+    "description": "Add first shared expense instruction"
+  },
+  "addFirstExpense": "Add First Expense",
+  "@addFirstExpense": {
+    "description": "Add first expense button"
+  },
+  "addNewExpense": "Add New Expense",
+  "@addNewExpense": {
+    "description": "Add new expense button"
+  },
+  "enterAmount": "Enter amount",
+  "@enterAmount": {
+    "description": "Enter amount instruction"
+  },
+  "enterValidAmount": "Enter valid amount",
+  "@enterValidAmount": {
+    "description": "Enter valid amount error"
+  },
+  "change": "Change",
+  "@change": {
+    "description": "Change button"
+  },
+  "addNoteAbout": "Add note about expense...",
+  "@addNoteAbout": {
+    "description": "Add note instruction"
+  },
+  "skip": "Skip",
+  "@skip": {
+    "description": "Skip button"
+  },
+  "next": "Next",
+  "@next": {
+    "description": "Next button"
+  },
+  "start": "Start",
+  "@start": {
+    "description": "Start button"
+  },
+  "selectLanguage": "Select Language",
+  "@selectLanguage": {
+    "description": "Select language tooltip"
+  },
+  "turkish": "Turkish",
+  "@turkish": {
+    "description": "Turkish language option"
+  },
+  "english": "English",
+  "@english": {
+    "description": "English language option"
+  },
+  "addExpense": "Add Expense",
+  "@addExpense": {
+    "description": "Add expense button"
+  },
+  "logout": "Logout",
+  "@logout": {
+    "description": "Logout button"
+  },
+  "deleteFriend": "Delete Friend",
+  "@deleteFriend": {
+    "description": "Delete friend button"
+  },
+  "addFirstFriend": "Add First Friend",
+  "@addFirstFriend": {
+    "description": "Add first friend button"
+  },
+  "addFriend": "Add Friend",
+  "@addFriend": {
+    "description": "Add friend button"
+  },
+  "add": "Add",
+  "@add": {
+    "description": "Add button"
+  },
+  "addSharedExpense": "Add Shared Expense",
+  "@addSharedExpense": {
+    "description": "Add shared expense button"
+  },
+  "fullAmount": "Full amount",
+  "@fullAmount": {
+    "description": "Full amount option"
+  },
+  "halfAmount": "Half amount",
+  "@halfAmount": {
+    "description": "Half amount option"
+  },
+  "addPayment": "Add Payment",
+  "@addPayment": {
+    "description": "Add payment button"
+  },
+  "addFirstExpense": "Add First Expense",
+  "@addFirstExpense": {
+    "description": "Add first expense button"
+  },
+  "food": "Food",
+  "@food": {
+    "description": "Food category"
+  },
+  "transportation": "Transportation",
+  "@transportation": {
+    "description": "Transportation category"
+  },
+  "clothing": "Clothing",
+  "@clothing": {
+    "description": "Clothing category"
+  },
+  "entertainment": "Entertainment",
+  "@entertainment": {
+    "description": "Entertainment category"
+  },
+  "bills": "Bills",
+  "@bills": {
+    "description": "Bills category"
+  },
+  "other": "Other",
+  "@other": {
+    "description": "Other category"
+  },
+  "refresh": "Refresh",
+  "@refresh": {
+    "description": "Refresh button tooltip"
+  },
+  "nightModeOn": "Night mode enabled",
+  "@nightModeOn": {
+    "description": "Night mode enabled message"
+  },
+  "dayModeOn": "Day mode enabled",
+  "@dayModeOn": {
+    "description": "Day mode enabled message"
+  },
+  "setSalaryDayText": "Set salary day",
+  "@setSalaryDayText": {
+    "description": "Set salary day text"
+  },
+  "clickToSetText": "Click to set",
+  "@clickToSetText": {
+    "description": "Click to set text"
+  },
+  "daysText": "days",
+  "@daysText": {
+    "description": "Days text"
+  },
+  "noBudgetSetText": "No budget set yet",
+  "@noBudgetSetText": {
+    "description": "No budget set text"
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Today filter"
+  },
+  "thisWeek": "This Week",
+  "@thisWeek": {
+    "description": "This week filter"
+  },
+  "thisMonth": "This Month",
+  "@thisMonth": {
+    "description": "This month filter"
+  },
+  "all": "All",
+  "@all": {
+    "description": "All filter"
+  },
+  "date": "Date",
+  "@date": {
+    "description": "Date sort"
+  },
+  "amount": "Amount",
+  "@amount": {
+    "description": "Amount sort"
+  },
+  "category": "Category",
+  "@category": {
+    "description": "Category sort"
+  },
+  "noExpensesYet": "No expenses yet",
+  "@noExpensesYet": {
+    "description": "No expenses yet message"
+  },
+  "friendsListRefreshed": "Friends list refreshed",
+  "@friendsListRefreshed": {
+    "description": "Friends list refreshed message"
+  },
+  "noFriendsAddedYet": "No friends added yet",
+  "@noFriendsAddedYet": {
+    "description": "No friends added yet message"
+  },
+  "userNotFound": "User not found",
+  "@userNotFound": {
+    "description": "User not found message"
+  },
+  "description": "Description",
+  "@description": {
+    "description": "Description label"
+  },
+  "descriptionHint": "Ex: Grocery shopping",
+  "@descriptionHint": {
+    "description": "Description input hint"
+  },
+  "fullAmountDesc": "Full amount is reflected as debt to the other party",
+  "@fullAmountDesc": {
+    "description": "Full amount description"
+  },
+  "halfAmountDesc": "Half of the amount is reflected as debt to the other party",
+  "@halfAmountDesc": {
+    "description": "Half amount description"
+  },
+  "youOweText": "You owe",
+  "@youOweText": {
+    "description": "You owe text"
+  },
+  "accountsEqual": "Accounts are equal",
+  "@accountsEqual": {
+    "description": "Accounts equal message"
+  },
+  "me": "Me",
+  "@me": {
+    "description": "Me text"
+  },
+  "sharedExpensesText": "Shared expenses",
+  "@sharedExpensesText": {
+    "description": "Shared expenses text"
+  }
+}
+
+
