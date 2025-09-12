@@ -15,19 +15,34 @@ import 'dart:async' show Stream;
 class User {
   final String id;
   final String username;
+  final String name;
+  final String email;
+  final String password;
   final DateTime createdAt;
 
-  User({required this.id, required this.username, required this.createdAt});
+  User(
+      {required this.id,
+      required this.username,
+      required this.name,
+      required this.email,
+      required this.password,
+      required this.createdAt});
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'username': username,
+        'name': name,
+        'email': email,
+        'password': password,
         'createdAt': createdAt.toIso8601String(),
       };
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'],
         username: json['username'],
+        name: json['name'] ?? '',
+        email: json['email'] ?? '',
+        password: json['password'] ?? '',
         createdAt: DateTime.parse(json['createdAt']),
       );
 }
@@ -143,42 +158,109 @@ class UserProvider extends ChangeNotifier {
 
   User? get currentUser => _currentUser;
 
-  Future<void> login(String username) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Kullanıcı ID'sini kullanıcı adından oluştur (sabit)
-    final userId = username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-
-    _currentUser = User(
-      id: userId,
-      username: username,
-      createdAt: DateTime.now(),
-    );
-
-    // Kullanıcı bilgilerini kaydet
-    await prefs.setString(
-        'currentUser', jsonEncode(_currentUser!.toJson())); //grdegstdegs
-    await prefs.setBool('isLoggedIn', true);
-
-    // Firebase'e kullanıcı kaydet
+  // Kayıt olma fonksiyonu
+  Future<String?> register(
+      String name, String email, String username, String password) async {
     try {
       if (!globalFirebaseInitialized) {
-        print('⚠️ Firebase başlatılmadı, kullanıcı kaydedilemiyor');
-        return;
+        return 'Firebase başlatılmadı';
       }
 
       final firestore = FirebaseFirestore.instance;
+      final userId =
+          username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      // Kullanıcı adı kontrolü
+      final existingUser =
+          await firestore.collection('users').doc(userId).get();
+      if (existingUser.exists) {
+        return 'Bu kullanıcı adı zaten kullanılıyor';
+      }
+
+      // Email kontrolü
+      final emailQuery = await firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+      if (emailQuery.docs.isNotEmpty) {
+        return 'Bu email adresi zaten kayıtlı';
+      }
+
+      // Yeni kullanıcı oluştur
+      final newUser = User(
+        id: userId,
+        username: username,
+        name: name,
+        email: email,
+        password: password,
+        createdAt: DateTime.now(),
+      );
+
+      // Firebase'e kaydet
       await firestore.collection('users').doc(userId).set({
         'id': userId,
         'username': username,
+        'name': name,
+        'email': email,
+        'password': password,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      print('✅ Kullanıcı Firebase\'e kaydedildi: $userId');
-    } catch (e) {
-      print('❌ Firebase kullanıcı kaydetme hatası: $e');
-    }
 
-    notifyListeners();
+      // Local storage'a kaydet
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('currentUser', jsonEncode(newUser.toJson()));
+      await prefs.setBool('isLoggedIn', true);
+
+      _currentUser = newUser;
+      notifyListeners();
+      return null; // Başarılı
+    } catch (e) {
+      return 'Kayıt olma hatası: $e';
+    }
+  }
+
+  // Giriş yapma fonksiyonu
+  Future<String?> login(String username, String password) async {
+    try {
+      if (!globalFirebaseInitialized) {
+        return 'Firebase başlatılmadı';
+      }
+
+      final firestore = FirebaseFirestore.instance;
+      final userId =
+          username.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      // Kullanıcıyı bul
+      final userDoc = await firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        return 'Kullanıcı bulunamadı';
+      }
+
+      final userData = userDoc.data()!;
+      if (userData['password'] != password) {
+        return 'Şifre hatalı';
+      }
+
+      // Kullanıcı bilgilerini yükle
+      _currentUser = User(
+        id: userData['id'],
+        username: userData['username'],
+        name: userData['name'],
+        email: userData['email'],
+        password: userData['password'],
+        createdAt: (userData['createdAt'] as Timestamp).toDate(),
+      );
+
+      // Local storage'a kaydet
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('currentUser', jsonEncode(_currentUser!.toJson()));
+      await prefs.setBool('isLoggedIn', true);
+
+      notifyListeners();
+      return null; // Başarılı
+    } catch (e) {
+      return 'Giriş yapma hatası: $e';
+    }
   }
 
   Future<void> logout() async {
@@ -322,17 +404,27 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  bool _isLoginMode = true; // true: giriş yap, false: kayıt ol
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  // Form controller'ları
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
     _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login(dynamic l10n) async {
+  Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -340,19 +432,42 @@ class _LoginPageState extends State<LoginPage> {
 
       try {
         final userProvider = UserProvider();
-        await userProvider.login(_usernameController.text.trim());
+        String? error;
 
-        if (mounted) {
+        if (_isLoginMode) {
+          // Giriş yap
+          error = await userProvider.login(
+            _usernameController.text.trim(),
+            _passwordController.text.trim(),
+          );
+        } else {
+          // Kayıt ol
+          error = await userProvider.register(
+            _nameController.text.trim(),
+            _emailController.text.trim(),
+            _usernameController.text.trim(),
+            _passwordController.text.trim(),
+          );
+        }
+
+        if (error == null && mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const KashiApp()),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error!),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${l10n.login} error: $e'),
+              content: Text('Hata: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -465,9 +580,85 @@ class _LoginPageState extends State<LoginPage> {
                   'Harcama Takip Uygulaması',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
 
-                // Login formu
+                // Giriş/Kayıt seçimi
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isLoginMode = true;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: _isLoginMode
+                                  ? Colors.blue[600]
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Giriş Yap',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _isLoginMode
+                                    ? Colors.white
+                                    : Colors.grey[600],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isLoginMode = false;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: !_isLoginMode
+                                  ? Colors.blue[600]
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Kayıt Ol',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: !_isLoginMode
+                                    ? Colors.white
+                                    : Colors.grey[600],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Form
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -486,29 +677,74 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       children: [
                         Text(
-                          l10n.welcome,
+                          _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey[800],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.setUsername,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
                         const SizedBox(height: 24),
 
-                        // Username alanı
+                        // İsim alanı (sadece kayıt ol modunda)
+                        if (!_isLoginMode) ...[
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'İsim',
+                              hintText: 'Adınızı girin',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'İsim gerekli';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Email alanı (sadece kayıt ol modunda)
+                        if (!_isLoginMode) ...[
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              hintText: 'email@example.com',
+                              prefixIcon: const Icon(Icons.email_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Email gerekli';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(value)) {
+                                return 'Geçerli bir email girin';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Kullanıcı adı alanı
                         TextFormField(
                           controller: _usernameController,
                           decoration: InputDecoration(
-                            labelText: l10n.username,
-                            hintText: l10n.usernameHint,
+                            labelText: 'Kullanıcı Adı',
+                            hintText: 'Kullanıcı adınızı girin',
                             prefixIcon: const Icon(Icons.person),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -518,24 +754,62 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return l10n.usernameRequired;
+                              return 'Kullanıcı adı gerekli';
                             }
                             if (value.trim().length < 3) {
-                              return l10n.usernameMinLength;
+                              return 'En az 3 karakter olmalı';
                             }
                             if (value.trim().length > 20) {
-                              return l10n.usernameMaxLength;
+                              return 'En fazla 20 karakter olmalı';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Şifre alanı
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Şifre',
+                            hintText: 'Şifrenizi girin',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Şifre gerekli';
+                            }
+                            if (value.length < 6) {
+                              return 'En az 6 karakter olmalı';
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 24),
 
-                        // Login butonu
+                        // Submit butonu
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : () => _login(l10n),
+                            onPressed: _isLoading ? null : _handleSubmit,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue[600],
                               foregroundColor: Colors.white,
@@ -556,7 +830,7 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   )
                                 : Text(
-                                    l10n.login,
+                                    _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -566,33 +840,6 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Bilgi kartı
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.blue[600]),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          l10n.idInfo,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -3091,7 +3338,7 @@ class _FriendsPageState extends State<FriendsPage> {
           // Arkadaş listesi
           Expanded(
             child: _friends.isEmpty
-                ? _buildEmptyState(context)
+                ? _buildEmptyState(l10n)
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _friends.length,
@@ -3366,7 +3613,7 @@ class _FriendsPageState extends State<FriendsPage> {
           ),
           const SizedBox(height: 24),
           Text(
-            l10n.noFriendsAddedYet,
+            l10n?.noFriendsAddedYet ?? 'Henüz arkadaş eklenmemiş',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -3386,7 +3633,7 @@ class _FriendsPageState extends State<FriendsPage> {
           ElevatedButton.icon(
             onPressed: () => _showAddFriendDialog(),
             icon: const Icon(Icons.person_add),
-            label: Text(l10n.addFirstFriend),
+            label: Text(l10n?.addFirstFriend ?? 'İlk Arkadaşını Ekle'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[600],
               foregroundColor: Colors.white,
@@ -4535,12 +4782,15 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                   // Önce Firebase'e kaydet
                   await _saveSharedExpenseToFirebase(newExpense);
 
-                  // Local state'i güncelleme - Firebase stream otomatik güncelleyecek
-                  // setState(() {
-                  //   _sharedExpenses.add(newExpense);
-                  // });
+                  // Net durumu yeniden yükle
+                  await _loadNetBalanceFromFirebase();
 
-                  // await _saveSharedExpenses();
+                  // UI'ı güncelle
+                  if (mounted) {
+                    setState(() {
+                      // State'i yenile
+                    });
+                  }
 
                   Navigator.pop(context);
 
@@ -4790,7 +5040,15 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
       print('✅ Ödeme Firebase\'e kaydedildi (tek kayıt): $amount₺');
 
+      // Net durumu yeniden yükle
+      await _loadNetBalanceFromFirebase();
+
+      // UI'ı güncelle
       if (mounted) {
+        setState(() {
+          // State'i yenile
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$amount₺ ödeme eklendi'),
@@ -4972,7 +5230,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                   ),
                   Expanded(
                     child: _sharedExpenses.isEmpty
-                        ? _buildEmptyExpenseState(context)
+                        ? _buildEmptyExpenseState(l10n)
                         : ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: _sharedExpenses.length,
@@ -5236,7 +5494,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             ElevatedButton.icon(
               onPressed: _showAddSharedExpenseDialog,
               icon: const Icon(Icons.add),
-              label: Text(l10n.addFirstExpense),
+              label: Text(l10n?.addFirstExpense ?? 'İlk Alışverişi Ekle'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green[600],
                 foregroundColor: Colors.white,
