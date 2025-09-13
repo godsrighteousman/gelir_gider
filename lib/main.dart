@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -174,7 +174,7 @@ class UserProvider extends ChangeNotifier {
       final existingUser =
           await firestore.collection('users').doc(userId).get();
       if (existingUser.exists) {
-        return 'Bu kullanıcı adı zaten kullanılıyor';
+        return 'userAlreadyExists'; // Localization key
       }
 
       // Email kontrolü
@@ -183,7 +183,7 @@ class UserProvider extends ChangeNotifier {
           .where('email', isEqualTo: email)
           .get();
       if (emailQuery.docs.isNotEmpty) {
-        return 'Bu email adresi zaten kayıtlı';
+        return 'emailAlreadyExists'; // Localization key
       }
 
       // Yeni kullanıcı oluştur
@@ -233,12 +233,12 @@ class UserProvider extends ChangeNotifier {
       // Kullanıcıyı bul
       final userDoc = await firestore.collection('users').doc(userId).get();
       if (!userDoc.exists) {
-        return 'Kullanıcı bulunamadı';
+        return 'userNotFound'; // Localization key
       }
 
       final userData = userDoc.data()!;
       if (userData['password'] != password) {
-        return 'Şifre hatalı';
+        return 'passwordIncorrect'; // Localization key
       }
 
       // Kullanıcı bilgilerini yükle
@@ -424,6 +424,21 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  String _getLocalizedError(String errorKey, dynamic l10n) {
+    switch (errorKey) {
+      case 'userNotFound':
+        return l10n.userNotFound;
+      case 'passwordIncorrect':
+        return l10n.passwordIncorrect;
+      case 'userAlreadyExists':
+        return l10n.userAlreadyExists;
+      case 'emailAlreadyExists':
+        return l10n.emailAlreadyExists;
+      default:
+        return errorKey; // Fallback to original error
+    }
+  }
+
   Future<void> _handleSubmit() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -432,6 +447,7 @@ class _LoginPageState extends State<LoginPage> {
 
       try {
         final userProvider = UserProvider();
+        final l10n = AppLocalizations.of(context)!;
         String? error;
 
         if (_isLoginMode) {
@@ -458,16 +474,18 @@ class _LoginPageState extends State<LoginPage> {
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(error!),
+              content: Text(_getLocalizedError(error!, l10n)),
               backgroundColor: Colors.red,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
+          final l10n = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Hata: $e'),
+              content:
+                  Text(_isLoginMode ? l10n.loginError : l10n.registrationError),
               backgroundColor: Colors.red,
             ),
           );
@@ -613,7 +631,7 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              'Giriş Yap',
+                              l10n.signIn,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: _isLoginMode
@@ -641,7 +659,7 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              'Kayıt Ol',
+                              l10n.signUp,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: !_isLoginMode
@@ -677,7 +695,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       children: [
                         Text(
-                          _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
+                          _isLoginMode ? l10n.signIn : l10n.signUp,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -691,8 +709,8 @@ class _LoginPageState extends State<LoginPage> {
                           TextFormField(
                             controller: _nameController,
                             decoration: InputDecoration(
-                              labelText: 'İsim',
-                              hintText: 'Adınızı girin',
+                              labelText: l10n.name,
+                              hintText: l10n.nameHint,
                               prefixIcon: const Icon(Icons.person_outline),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -702,7 +720,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'İsim gerekli';
+                                return l10n.nameRequired;
                               }
                               return null;
                             },
@@ -716,8 +734,8 @@ class _LoginPageState extends State<LoginPage> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'email@example.com',
+                              labelText: l10n.email,
+                              hintText: l10n.emailHint,
                               prefixIcon: const Icon(Icons.email_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -727,11 +745,11 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Email gerekli';
+                                return l10n.emailRequired;
                               }
                               if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                   .hasMatch(value)) {
-                                return 'Geçerli bir email girin';
+                                return l10n.emailInvalid;
                               }
                               return null;
                             },
@@ -743,8 +761,8 @@ class _LoginPageState extends State<LoginPage> {
                         TextFormField(
                           controller: _usernameController,
                           decoration: InputDecoration(
-                            labelText: 'Kullanıcı Adı',
-                            hintText: 'Kullanıcı adınızı girin',
+                            labelText: l10n.username,
+                            hintText: l10n.usernameHint,
                             prefixIcon: const Icon(Icons.person),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -754,13 +772,13 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Kullanıcı adı gerekli';
+                              return l10n.usernameRequired;
                             }
                             if (value.trim().length < 3) {
-                              return 'En az 3 karakter olmalı';
+                              return l10n.usernameMinLength;
                             }
                             if (value.trim().length > 20) {
-                              return 'En fazla 20 karakter olmalı';
+                              return l10n.usernameMaxLength;
                             }
                             return null;
                           },
@@ -772,8 +790,8 @@ class _LoginPageState extends State<LoginPage> {
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
-                            labelText: 'Şifre',
-                            hintText: 'Şifrenizi girin',
+                            labelText: l10n.password,
+                            hintText: l10n.passwordHint,
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -795,10 +813,10 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Şifre gerekli';
+                              return l10n.passwordRequired;
                             }
                             if (value.length < 6) {
-                              return 'En az 6 karakter olmalı';
+                              return l10n.passwordMinLength;
                             }
                             return null;
                           },
@@ -830,7 +848,7 @@ class _LoginPageState extends State<LoginPage> {
                                     ),
                                   )
                                 : Text(
-                                    _isLoginMode ? 'Giriş Yap' : 'Kayıt Ol',
+                                    _isLoginMode ? l10n.signIn : l10n.signUp,
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -862,6 +880,7 @@ class _KashiAppState extends State<KashiApp> {
   final UserProvider _userProvider = UserProvider();
   final ThemeProvider _themeProvider = ThemeProvider();
   final LanguageProvider _languageProvider = LanguageProvider();
+  final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
   bool _isLoading = true;
   bool _isLoggedIn = false;
 
@@ -989,6 +1008,7 @@ class _KashiAppState extends State<KashiApp> {
               darkTheme: _buildLightDarkTheme(),
               themeMode: themeProvider.themeMode,
               locale: languageProvider.locale,
+              navigatorObservers: [routeObserver],
               localizationsDelegates: const [
                 AppLocalizations.delegate,
                 GlobalMaterialLocalizations.delegate,
@@ -1021,6 +1041,7 @@ class _KashiAppState extends State<KashiApp> {
             darkTheme: _buildLightDarkTheme(),
             themeMode: themeProvider.themeMode,
             locale: languageProvider.locale,
+            navigatorObservers: [routeObserver],
             localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
@@ -1134,6 +1155,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       ], eagerError: false)
           .catchError((e) {
         print('⚠️ Bazı Firebase işlemleri başarısız: $e');
+        return <void>[];
       });
 
       // Tema ayarını yükle
@@ -1160,9 +1182,10 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     } catch (e) {
       print('❌ Veri yükleme hatası: $e');
       if (mounted && ScaffoldMessenger.of(context).mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Data loading error: $e'),
+            content: Text('${l10n.dataLoadingError}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1360,42 +1383,6 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     }
   }
 
-  // Real-time harcama listener'ı başlat
-  void _startExpensesListener() {
-    if (_userProvider.currentUser == null) return;
-
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final userId = _userProvider.currentUser!.id;
-
-      _expensesSubscription = firestore
-          .collection('userExpenses')
-          .where('userId', isEqualTo: userId)
-          .where('type', isEqualTo: 'personal')
-          .orderBy('date', descending: true)
-          .snapshots()
-          .listen((snapshot) {
-        if (mounted) {
-          setState(() {
-            _expenses.clear();
-            _expenses.addAll(snapshot.docs.map((doc) {
-              final data = doc.data();
-              return Expense(
-                amount: (data['amount'] as num).toDouble(),
-                category: data['category'] as String? ?? 'other',
-                date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                note: data['note'] as String?,
-              );
-            }));
-          });
-        }
-        print('🔄 Real-time güncelleme: ${_expenses.length} harcama');
-      });
-    } catch (e) {
-      print('❌ Real-time listener başlatma hatası: $e');
-    }
-  }
-
   // Harcamaları kaydet
   Future<void> _saveExpenses() async {
     try {
@@ -1504,11 +1491,12 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     }
 
     // Arka planda kaydetme işlemlerini yap
-    _saveExpenseInBackground(expense);
+    final l10n = AppLocalizations.of(context)!;
+    _saveExpenseInBackground(expense, l10n);
   }
 
   // Arka planda harcama kaydetme
-  Future<void> _saveExpenseInBackground(Expense expense) async {
+  Future<void> _saveExpenseInBackground(Expense expense, dynamic l10n) async {
     try {
       print('🔄 Harcama arka planda kaydediliyor...');
 
@@ -1529,7 +1517,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Expense save error: $e'),
+            content: Text('${l10n.expenseSaveError}: $e'),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1565,7 +1553,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               }
 
               // Arka planda silme işlemlerini yap
-              _removeExpenseInBackground(expense);
+              _removeExpenseInBackground(expense, l10n);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text(l10n.delete),
@@ -1576,7 +1564,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
   }
 
   // Arka planda harcama silme
-  Future<void> _removeExpenseInBackground(Expense expense) async {
+  Future<void> _removeExpenseInBackground(Expense expense, dynamic l10n) async {
     try {
       print('🔄 Harcama arka planda siliniyor...');
 
@@ -1597,7 +1585,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Harcama silinirken hata oluştu: $e'),
+            content: Text('${l10n.expenseDeleteError}: $e'),
             backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1675,6 +1663,13 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
     if (_totalBudget == null) return 0;
     double spent = _expenses.fold(0.0, (sum, e) => sum + e.amount);
     return _totalBudget! - spent;
+  }
+
+  // Tüm arkadaşlarla olan net balance toplamını hesapla
+  double _calculateTotalNetBalance() {
+    // Şimdilik basit bir hesaplama yapalım
+    // Gerçek hesaplama için FriendsPage'deki verileri kullanmamız gerekecek
+    return 0.0; // Geçici olarak 0 döndür
   }
 
   int get _daysUntilSalary {
@@ -1786,8 +1781,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               controller: controller,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Gün (1-31)',
-                hintText: 'Örn: 15',
+                labelText: l10n.day,
+                hintText: l10n.dayHint,
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
@@ -1857,8 +1852,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               controller: controller,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Bütçe (₺)',
-                hintText: 'Örn: 5000.00',
+                labelText: l10n.budget,
+                hintText: l10n.budgetHint,
                 prefixIcon: const Icon(Icons.attach_money),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -2013,8 +2008,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                     ClipboardData(text: _userProvider.currentUser!.id));
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content:
-                        Text('ID kopyalandı: ${_userProvider.currentUser!.id}'),
+                    content: Text(
+                        '${l10n.idCopied}: ${_userProvider.currentUser!.id}'),
                     backgroundColor: Colors.green,
                     duration: const Duration(seconds: 2),
                   ),
@@ -2208,12 +2203,30 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
+                  // Net balance kartı
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Net Durum',
+                          '₺${_calculateTotalNetBalance().toStringAsFixed(0)}',
+                          Icons.account_balance,
+                          _calculateTotalNetBalance() > 0
+                              ? Colors.green
+                              : _calculateTotalNetBalance() < 0
+                                  ? Colors.red
+                                  : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   // Harcama geçmişi istatistikleri
                   Row(
                     children: [
                       Expanded(
                         child: _buildStatCard(
-                          'Toplam Harcama',
+                          l10n.totalExpenses,
                           '₺${_expenses.fold<double>(0.0, (sum, e) => sum + e.amount).toStringAsFixed(2)}',
                           Icons.account_balance_wallet,
                           Colors.purple,
@@ -2222,7 +2235,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Harcama Sayısı',
+                          l10n.expenseCount,
                           '${_expenses.length}',
                           Icons.receipt_long,
                           Colors.indigo,
@@ -2231,7 +2244,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Kategori Sayısı',
+                          l10n.categoryCount,
                           '${_expenses.map((e) => e.category).toSet().length}',
                           Icons.category,
                           Colors.teal,
@@ -2245,7 +2258,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                     children: [
                       Expanded(
                         child: _buildStatCard(
-                          'Bugün',
+                          l10n.today,
                           '₺${toplamGunluk.toStringAsFixed(2)}',
                           Icons.today,
                           Colors.blue,
@@ -2254,7 +2267,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Bu Hafta',
+                          l10n.thisWeek,
                           '₺${toplamHaftalik.toStringAsFixed(2)}',
                           Icons.view_week,
                           Colors.orange,
@@ -2263,7 +2276,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Bu Ay',
+                          l10n.thisMonth,
                           '₺${toplamAylik.toStringAsFixed(2)}',
                           Icons.calendar_month,
                           Colors.green,
@@ -2876,16 +2889,33 @@ class FriendsPage extends StatefulWidget {
   State<FriendsPage> createState() => _FriendsPageState();
 }
 
-class _FriendsPageState extends State<FriendsPage> {
+class _FriendsPageState extends State<FriendsPage> with RouteAware {
   final List<Friend> _friends = [];
   final List<SharedExpense> _sharedExpenses = [];
   final UserProvider _userProvider = UserProvider();
   StreamSubscription<QuerySnapshot>? _friendsSubscription;
+  StreamSubscription<QuerySnapshot>? _sharedExpensesSubscription;
+
+  // Arkadaşlar için net durum cache'i
+  Map<String, double> _friendsNetBalanceCache = {};
 
   @override
   void initState() {
     super.initState();
     _initializeFriends();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      // RouteObserver'ı bul ve subscribe et
+      final appState = context.findAncestorStateOfType<_KashiAppState>();
+      if (appState != null) {
+        appState.routeObserver.subscribe(this, route);
+      }
+    }
   }
 
   Future<void> _initializeFriends() async {
@@ -2894,12 +2924,34 @@ class _FriendsPageState extends State<FriendsPage> {
     await _loadFriendsFromFirebase(); // Sonra Firebase'den güncelle
     await _loadAllSharedExpenses(); // Tüm ortak harcamaları yükle
     _listenToFriends(); // Gerçek zamanlı dinlemeyi başlat
+    _listenToSharedExpenses(); // Ortak harcamaları dinlemeyi başlat
   }
 
   @override
   void dispose() {
     _friendsSubscription?.cancel();
+    _sharedExpensesSubscription?.cancel();
+    final appState = context.findAncestorStateOfType<_KashiAppState>();
+    if (appState != null) {
+      appState.routeObserver.unsubscribe(this);
+    }
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Arkadaş detay sayfasından geri döndüğümüzde verileri yenile
+    super.didPopNext();
+    _refreshData();
+  }
+
+  // Verileri yenile
+  Future<void> _refreshData() async {
+    await _loadAllSharedExpenses();
+    await _loadFriendsNetBalances();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadUser() async {
@@ -3036,7 +3088,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                        '${friendToRemove.fullName} arkadaş listesinden silindi'),
+                        '${friendToRemove.fullName} ${l10n.friendRemoved}'),
                     backgroundColor: Colors.green,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
@@ -3095,38 +3147,6 @@ class _FriendsPageState extends State<FriendsPage> {
     }
   }
 
-  double _getTotalDebtFor(Friend friend) {
-    // Bu fonksiyon artık kullanılmıyor, _calculateDebtFor kullanılıyor
-    return _calculateDebtFor(friend);
-  }
-
-  int _getSharedExpenseCount(Friend friend) {
-    // Bu fonksiyon artık kullanılmıyor, _getExpenseCountFor kullanılıyor
-    return _getExpenseCountFor(friend);
-  }
-
-  // Yeni borç hesaplama sistemi
-  double _calculateDebtFor(Friend friend) {
-    if (_userProvider.currentUser == null) return 0.0;
-
-    final userId = _userProvider.currentUser!.id;
-    final friendId = friend.userId;
-
-    // Shared expenses'i hesapla
-    double totalDebt = 0.0;
-
-    // Benim eklediğim harcamalar (arkadaşım bana borçlu)
-    for (final expense in _getSharedExpensesForFriend(friend)) {
-      if (expense.debtType == 'full') {
-        totalDebt += expense.amount; // Arkadaşım bana tam tutarı borçlu
-      } else {
-        totalDebt += expense.amount / 2; // Arkadaşım bana yarısını borçlu
-      }
-    }
-
-    return totalDebt;
-  }
-
   // Net borç/alacak hesaplama (DB'den)
   double _calculateNetDebtFor(Friend friend) {
     // Firebase'den net durumu al
@@ -3135,9 +3155,96 @@ class _FriendsPageState extends State<FriendsPage> {
 
   // Cache'den net durum alma
   double _getNetBalanceFromCache(String friendId) {
-    // Bu fonksiyon arkadaşlar listesinde kullanılıyor
-    // Şimdilik 0 döndür, daha sonra cache sistemi eklenebilir
-    return 0.0;
+    // Arkadaşlar için net durum cache'inden al
+    return _friendsNetBalanceCache[friendId] ?? 0.0;
+  }
+
+  // Arkadaş için toplam alışveriş sayısını hesapla
+  int _getTotalExpenseCountFor(Friend friend) {
+    int totalCount = 0;
+
+    // Shared expenses'ları kontrol et
+    for (final expense in _sharedExpenses) {
+      if ((expense.createdBy == _userProvider.currentUser?.id &&
+              expense.expenseOwnerId == friend.userId) ||
+          (expense.createdBy == friend.userId &&
+              expense.expenseOwnerId == _userProvider.currentUser?.id)) {
+        totalCount++;
+      }
+    }
+
+    return totalCount;
+  }
+
+  // Arkadaşlar için net durum bilgilerini yükle
+  Future<void> _loadFriendsNetBalances() async {
+    if (_userProvider.currentUser == null) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final userId = _userProvider.currentUser!.id;
+
+      print('🔍 Arkadaşlar için net durum bilgileri yükleniyor...');
+
+      for (final friend in _friends) {
+        try {
+          final friendId = friend.userId;
+
+          // Sabit sıralama: Alfabetik sıraya göre user1 ve user2 belirle
+          final user1Id = userId.compareTo(friendId) < 0 ? userId : friendId;
+          final user2Id = userId.compareTo(friendId) < 0 ? friendId : userId;
+
+          // Net durum dokümanını al (arkadaş detay sayfasındaki mantıkla aynı)
+          final netBalanceQuery = await firestore
+              .collection('netBalances')
+              .where('user1Id', isEqualTo: user1Id)
+              .where('user2Id', isEqualTo: user2Id)
+              .get();
+
+          if (netBalanceQuery.docs.isNotEmpty) {
+            final data = netBalanceQuery.docs.first.data();
+            double rawNetBalance = (data['netBalance'] as num).toDouble();
+
+            // Perspektif düzeltmesi: Net durum her zaman user1 perspektifinden kaydediliyor
+            // user1: pozitif değer = alacaklı, negatif değer = borçlu
+            // user2: pozitif değer = borçlu, negatif değer = alacaklı
+            double netBalance;
+            if (data['user1Id'] == userId) {
+              // Ben user1'im, değer zaten benim perspektifimden
+              netBalance = rawNetBalance;
+            } else {
+              // Ben user2'yim, değeri benim perspektifime çevir
+              // user1'in alacağı = user2'nin borcu
+              // user1'in borcu = user2'nin alacağı
+              netBalance = -rawNetBalance;
+            }
+
+            // Cache'e kaydet
+            _friendsNetBalanceCache[friend.userId] = netBalance;
+
+            print(
+                '📊 ${friend.displayName} net durum: ${netBalance > 0 ? '+' : ''}${netBalance}₺');
+          } else {
+            // Net durum bulunamadı, 0 olarak ayarla
+            _friendsNetBalanceCache[friend.userId] = 0.0;
+            print(
+                '📊 ${friend.displayName} net durum bulunamadı, varsayılan: 0₺');
+          }
+        } catch (e) {
+          print('❌ ${friend.displayName} net durum yükleme hatası: $e');
+          _friendsNetBalanceCache[friend.userId] = 0.0;
+        }
+      }
+
+      // UI'ı güncelle
+      if (mounted) {
+        setState(() {});
+      }
+
+      print('✅ ${_friends.length} arkadaş için net durum bilgileri yüklendi');
+    } catch (e) {
+      print('❌ Arkadaşlar net durum yükleme hatası: $e');
+    }
   }
 
   // Borç durumu açıklaması (Düzeltilmiş mantık)
@@ -3242,8 +3349,8 @@ class _FriendsPageState extends State<FriendsPage> {
                     ClipboardData(text: _userProvider.currentUser!.id));
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content:
-                        Text('ID kopyalandı: ${_userProvider.currentUser!.id}'),
+                    content: Text(
+                        '${l10n.idCopied}: ${_userProvider.currentUser!.id}'),
                     backgroundColor: Colors.green,
                     duration: const Duration(seconds: 2),
                   ),
@@ -3264,6 +3371,7 @@ class _FriendsPageState extends State<FriendsPage> {
                 // Tüm verileri yenile
                 await _loadFriendsFromFirebase();
                 await _loadAllSharedExpenses();
+                await _loadFriendsNetBalances();
 
                 // UI'ı güncelle
                 if (mounted) {
@@ -3401,200 +3509,295 @@ class _FriendsPageState extends State<FriendsPage> {
 
   Widget _buildFriendCard(Friend friend, int index) {
     final netDebt = _calculateNetDebtFor(friend);
-    final expenseCount = _getExpenseCountFor(friend);
+    final totalExpenseCount = _getTotalExpenseCountFor(friend);
     final isOwed = netDebt > 0; // Pozitif ise arkadaşım bana borçlu
     final isDebtor = netDebt < 0; // Negatif ise ben arkadaşıma borçluyum
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Column(
+      children: [
+        // Net durum bilgisi üstte
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isOwed
+                ? Colors.green[50]
+                : isDebtor
+                    ? Colors.red[50]
+                    : Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isOwed
+                  ? Colors.green[200]!
+                  : isDebtor
+                      ? Colors.red[200]!
+                      : Colors.grey[300]!,
+              width: 1,
+            ),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => FriendDetailPage(friend: friend),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Net Durum',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isOwed
+                        ? '${friend.displayName} sana borçlu'
+                        : isDebtor
+                            ? 'Sen ${friend.displayName}\'a borçlusun'
+                            : 'Eşit durumda',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Avatar
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue[400]!,
-                        Colors.blue[600]!,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Text(
-                      friend.fullName[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    isOwed
+                        ? '+₺${netDebt.abs().toStringAsFixed(0)}'
+                        : isDebtor
+                            ? '-₺${netDebt.abs().toStringAsFixed(0)}'
+                            : '₺0',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isOwed
+                          ? Colors.green[700]
+                          : isDebtor
+                              ? Colors.red[700]
+                              : Colors.grey[600],
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-
-                // İsim ve bilgiler
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        friend.fullName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                  const SizedBox(height: 2),
+                  Text(
+                    isOwed
+                        ? 'Alacak'
+                        : isDebtor
+                            ? 'Borç'
+                            : 'Eşit',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isOwed
+                          ? Colors.green[600]
+                          : isDebtor
+                              ? Colors.red[600]
+                              : Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Arkadaş kartı
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FriendDetailPage(friend: friend),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.blue[400]!,
+                            Colors.blue[600]!,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'ID: ${friend.userId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.receipt_long,
-                            size: 14,
-                            color: Colors.grey[600],
+                      child: Center(
+                        child: Text(
+                          friend.fullName[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // İsim ve bilgiler
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '$expenseCount ortak alışveriş',
+                            friend.fullName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'ID: ${friend.userId}',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.receipt_long,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$totalExpenseCount toplam alışveriş',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _getDebtStatusText(friend, context),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isOwed
+                                  ? Colors.green[600]
+                                  : isDebtor
+                                      ? Colors.red[600]
+                                      : Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getDebtStatusText(friend, context),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isOwed
-                              ? Colors.green[600]
-                              : isDebtor
-                                  ? Colors.red[600]
-                                  : Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Borç durumu ve işlemler
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isOwed
-                            ? Colors.green[50]
-                            : isDebtor
-                                ? Colors.red[50]
-                                : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isOwed
-                            ? '+₺${netDebt.abs().toStringAsFixed(0)}'
-                            : isDebtor
-                                ? '-₺${netDebt.abs().toStringAsFixed(0)}'
-                                : '₺0',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: isOwed
-                              ? Colors.green[700]
-                              : isDebtor
-                                  ? Colors.red[700]
-                                  : Colors.grey[600],
-                        ),
-                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+
+                    // Borç durumu ve işlemler
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(6),
+                            color: isOwed
+                                ? Colors.green[50]
+                                : isDebtor
+                                    ? Colors.red[50]
+                                    : Colors.grey[50],
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
-                            Icons.chat,
-                            size: 16,
-                            color: Colors.grey[600],
+                          child: Text(
+                            isOwed
+                                ? '+₺${netDebt.abs().toStringAsFixed(0)}'
+                                : isDebtor
+                                    ? '-₺${netDebt.abs().toStringAsFixed(0)}'
+                                    : '₺0',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isOwed
+                                  ? Colors.green[700]
+                                  : isDebtor
+                                      ? Colors.red[700]
+                                      : Colors.grey[600],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _removeFriend(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.red[50],
-                              borderRadius: BorderRadius.circular(6),
+                        const SizedBox(height: 8),
+                        // Butonlar
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(
+                                Icons.chat,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
                             ),
-                            child: Icon(
-                              Icons.delete_outline,
-                              size: 16,
-                              color: Colors.red[600],
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _removeFriend(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(
+                                  Icons.delete_outline,
+                                  size: 16,
+                                  color: Colors.red[600],
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildEmptyState(dynamic l10n) {
+  Widget _buildEmptyState(AppLocalizations? l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -3622,7 +3825,8 @@ class _FriendsPageState extends State<FriendsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Arkadaşlarınızı ekleyerek ortak\nharcamalarınızı takip edin',
+            l10n?.addFriendsToTrack ??
+                'Arkadaşlarınızı ekleyerek ortak\nharcamalarınızı takip edin',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -3720,8 +3924,8 @@ class _FriendsPageState extends State<FriendsPage> {
               TextField(
                 controller: userIdController,
                 decoration: InputDecoration(
-                  labelText: 'Arkadaş ID',
-                  hintText: 'Örn: ahmet',
+                  labelText: l10n.friendId,
+                  hintText: l10n.friendIdHint,
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -3799,7 +4003,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     color: Colors.blue[50],
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       SizedBox(
                         width: 20,
@@ -3807,7 +4011,7 @@ class _FriendsPageState extends State<FriendsPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                       SizedBox(width: 12),
-                      Text('Kullanıcı aranıyor...'),
+                      Text(l10n.searchingUser),
                     ],
                   ),
                 ),
@@ -3963,8 +4167,7 @@ class _FriendsPageState extends State<FriendsPage> {
         if (mounted && ScaffoldMessenger.of(context).mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text('$friendUsername ile karşılıklı arkadaşlık kuruldu!'),
+              content: Text('$friendUsername ${l10n.friendshipEstablished}'),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -3977,7 +4180,7 @@ class _FriendsPageState extends State<FriendsPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Arkadaşlık eklenirken hata oluştu: $e'),
+              content: Text('${l10n.friendshipAddError}: $e'),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -4041,6 +4244,9 @@ class _FriendsPageState extends State<FriendsPage> {
       // Local storage'a kaydet
       await _saveFriends();
       print('💾 ${firebaseFriends.length} arkadaş local storage\'a kaydedildi');
+
+      // Her arkadaş için net durum bilgisini yükle
+      await _loadFriendsNetBalances();
     } catch (e) {
       print('❌ Firebase arkadaş yükleme hatası: $e');
       // Hata durumunda local storage'dan yükle
@@ -4102,6 +4308,63 @@ class _FriendsPageState extends State<FriendsPage> {
       });
     } catch (e) {
       print('❌ Firebase gerçek zamanlı arkadaş dinleme hatası: $e');
+    }
+  }
+
+  // Ortak harcamaları gerçek zamanlı dinle
+  void _listenToSharedExpenses() async {
+    if (_userProvider.currentUser == null) return;
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final userId = _userProvider.currentUser!.id;
+
+      print('🔍 Ortak harcamalar gerçek zamanlı dinleniyor: $userId');
+
+      _sharedExpensesSubscription = firestore
+          .collection('userExpenses')
+          .where('sharedWith', arrayContains: userId)
+          .snapshots()
+          .listen((snapshot) {
+        print(
+            '📡 Firebase\'den ${snapshot.docs.length} ortak harcama güncellendi');
+
+        final List<SharedExpense> firebaseSharedExpenses = [];
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          try {
+            final category = data['category'] as String? ?? 'other';
+            final finalCategory = category.isEmpty ? 'other' : category;
+
+            firebaseSharedExpenses.add(SharedExpense(
+              id: doc.id,
+              amount: (data['amount'] as num).toDouble(),
+              description: data['description'] as String,
+              date: (data['date'] as Timestamp).toDate(),
+              category: finalCategory,
+              debtType: data['debtType'] as String? ?? 'equal',
+              createdBy: data['createdBy'] as String,
+              createdByName: data['createdByName'] as String,
+              expenseOwnerId: data['expenseOwnerId'] as String,
+            ));
+          } catch (e) {
+            print('❌ Ortak harcama yükleme hatası: $e');
+          }
+        }
+
+        setState(() {
+          _sharedExpenses.clear();
+          _sharedExpenses.addAll(firebaseSharedExpenses);
+        });
+
+        // Net balance'ları yeniden yükle
+        _loadFriendsNetBalances();
+
+        print('💾 ${firebaseSharedExpenses.length} ortak harcama güncellendi');
+      });
+    } catch (e) {
+      print('❌ Firebase gerçek zamanlı ortak harcama dinleme hatası: $e');
     }
   }
 }
@@ -4635,8 +4898,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                 controller: amountController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'Tutar (₺)',
-                  hintText: 'Örn: 250.00',
+                  labelText: l10n.amount,
+                  hintText: l10n.amountHint,
                   prefixIcon: const Icon(Icons.attach_money),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -4830,14 +5093,11 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     );
   }
 
-  // Net borç/alacak hesaplama (DB'den)
-  double _calculateNetDebtForFriend() {
-    // TODO: Firebase'den net durumu yükle
-    return _cachedNetBalance;
-  }
-
   // Cache'lenmiş net durum
   double _cachedNetBalance = 0.0;
+
+  // Arkadaşlar için net durum cache'i
+  Map<String, double> _friendsNetBalanceCache = {};
 
   String _getCategoryName(String category, BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -4950,8 +5210,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               controller: amountController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Ödeme Tutarı (₺)',
-                hintText: 'Örn: 100.00',
+                labelText: l10n.paymentAmount,
+                hintText: l10n.paymentAmountHint,
                 prefixIcon: const Icon(Icons.attach_money),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -4964,8 +5224,8 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             TextField(
               controller: noteController,
               decoration: InputDecoration(
-                labelText: 'Not (opsiyonel)',
-                hintText: 'Örn: Nakit ödeme',
+                labelText: l10n.note,
+                hintText: l10n.noteHint,
                 prefixIcon: const Icon(Icons.note),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -5064,9 +5324,6 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     }
   }
 
-  double get _totalShared =>
-      _sharedExpenses.fold(0, (sum, e) => sum + e.amount);
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -5119,7 +5376,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Sayfa yenilendi'),
+                      content: Text(l10n.pageRefreshed),
                       backgroundColor: Colors.blue,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
@@ -5150,7 +5407,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             ),
             child: IconButton(
               icon: const Icon(Icons.add, color: Colors.white),
-              tooltip: 'Alışveriş Ekle',
+              tooltip: l10n.addShopping,
               onPressed: _showAddSharedExpenseDialog,
             ),
           ),
@@ -5165,7 +5422,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               children: [
                 Expanded(
                   child: _buildSummaryCard(
-                    'Net Durum',
+                    l10n.netStatus,
                     '₺${_cachedNetBalance.toStringAsFixed(2)}',
                     Icons.account_balance_wallet,
                     _cachedNetBalance > 0
@@ -5174,20 +5431,20 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                             ? Colors.red
                             : Colors.orange,
                     _cachedNetBalance > 0
-                        ? '${widget.friend.fullName} size borçlu'
+                        ? '${widget.friend.fullName} ${l10n.owesYou}'
                         : _cachedNetBalance < 0
-                            ? 'Siz ${widget.friend.fullName}\'e borçlusunuz'
-                            : 'Hesap eşit',
+                            ? l10n.youOwe(widget.friend.fullName)
+                            : l10n.accountEqual,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildSummaryCard(
-                    'Toplam Alışveriş',
+                    l10n.totalShopping,
                     '${_sharedExpenses.length}',
                     Icons.receipt_long,
                     Colors.blue,
-                    'Ortak harcama',
+                    l10n.sharedExpense,
                   ),
                 ),
               ],
@@ -5623,7 +5880,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: 'Tutar',
+                        labelText: l10n.amountLabel,
                         hintText: '0.00',
                         prefixIcon: const Icon(Icons.attach_money),
                         suffixText: '₺',
@@ -5737,7 +5994,7 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                                 });
                               }
                             },
-                            child: const Text('Değiştir'),
+                            child: Text(l10n.change),
                           ),
                         ],
                       ),
@@ -5749,8 +6006,8 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                       controller: _noteController,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        labelText: 'Not (opsiyonel)',
-                        hintText: 'Harcama hakkında not ekleyin...',
+                        labelText: l10n.expenseNote,
+                        hintText: l10n.expenseNoteHint,
                         prefixIcon: const Icon(Icons.note),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

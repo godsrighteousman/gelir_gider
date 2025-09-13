@@ -599,6 +599,267 @@
   "sharedExpensesText": "Shared expenses",
   "@sharedExpensesText": {
     "description": "Shared expenses text"
+  },
+  "signIn": "Sign In",
+  "@signIn": {
+    "description": "Sign in button"
+  },
+  "signUp": "Sign Up",
+  "@signUp": {
+    "description": "Sign up button"
+  },
+  "name": "Name",
+  "@name": {
+    "description": "Name label"
+  },
+  "nameHint": "Enter your name",
+  "@nameHint": {
+    "description": "Name input hint"
+  },
+  "nameRequired": "Name is required",
+  "@nameRequired": {
+    "description": "Name required error"
+  },
+  "email": "Email",
+  "@email": {
+    "description": "Email label"
+  },
+  "emailHint": "email@example.com",
+  "@emailHint": {
+    "description": "Email input hint"
+  },
+  "emailRequired": "Email is required",
+  "@emailRequired": {
+    "description": "Email required error"
+  },
+  "emailInvalid": "Please enter a valid email address",
+  "@emailInvalid": {
+    "description": "Email invalid error"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password label"
+  },
+  "passwordHint": "Enter your password",
+  "@passwordHint": {
+    "description": "Password input hint"
+  },
+  "passwordRequired": "Password is required",
+  "@passwordRequired": {
+    "description": "Password required error"
+  },
+  "passwordMinLength": "Password must be at least 6 characters",
+  "@passwordMinLength": {
+    "description": "Password minimum length error"
+  },
+  "usernameHint": "Enter your username",
+  "@usernameHint": {
+    "description": "Username input hint"
+  },
+  "usernameRequired": "Username is required",
+  "@usernameRequired": {
+    "description": "Username required error"
+  },
+  "usernameMinLength": "Username must be at least 3 characters",
+  "@usernameMinLength": {
+    "description": "Username minimum length error"
+  },
+  "usernameMaxLength": "Username must be at most 20 characters",
+  "@usernameMaxLength": {
+    "description": "Username maximum length error"
+  },
+  "passwordIncorrect": "Incorrect password",
+  "@passwordIncorrect": {
+    "description": "Password incorrect error"
+  },
+  "userAlreadyExists": "This username is already taken",
+  "@userAlreadyExists": {
+    "description": "User already exists error"
+  },
+  "emailAlreadyExists": "This email is already registered",
+  "@emailAlreadyExists": {
+    "description": "Email already exists error"
+  },
+  "registrationSuccess": "Registration successful! You can now sign in",
+  "@registrationSuccess": {
+    "description": "Registration success message"
+  },
+  "loginSuccess": "Login successful!",
+  "@loginSuccess": {
+    "description": "Login success message"
+  },
+  "loginError": "Error occurred during login",
+  "@loginError": {
+    "description": "Login error message"
+  },
+  "registrationError": "Error occurred during registration",
+  "@registrationError": {
+    "description": "Registration error message"
+  },
+  "idCopied": "ID copied",
+  "@idCopied": {
+    "description": "ID copied message"
+  },
+  "pageRefreshed": "Page refreshed",
+  "@pageRefreshed": {
+    "description": "Page refreshed message"
+  },
+  "expenseDeleteError": "Error occurred while deleting expense",
+  "@expenseDeleteError": {
+    "description": "Expense delete error message"
+  },
+  "expenseSaveError": "Error occurred while saving expense",
+  "@expenseSaveError": {
+    "description": "Expense save error message"
+  },
+  "friendRemoved": "removed from friends list",
+  "@friendRemoved": {
+    "description": "Friend removed message"
+  },
+  "friendshipEstablished": "mutual friendship established!",
+  "@friendshipEstablished": {
+    "description": "Friendship established message"
+  },
+  "friendshipAddError": "Error occurred while adding friendship",
+  "@friendshipAddError": {
+    "description": "Friendship add error message"
+  },
+  "totalExpenses": "Total Expenses",
+  "@totalExpenses": {
+    "description": "Total expenses label"
+  },
+  "expenseCount": "Expense Count",
+  "@expenseCount": {
+    "description": "Expense count label"
+  },
+  "categoryCount": "Category Count",
+  "@categoryCount": {
+    "description": "Category count label"
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Today label"
+  },
+  "thisWeek": "This Week",
+  "@thisWeek": {
+    "description": "This week label"
+  },
+  "thisMonth": "This Month",
+  "@thisMonth": {
+    "description": "This month label"
+  },
+  "netStatus": "Net Status",
+  "@netStatus": {
+    "description": "Net status label"
+  },
+  "totalShopping": "Total Shopping",
+  "@totalShopping": {
+    "description": "Total shopping label"
+  },
+  "addShopping": "Add Shopping",
+  "@addShopping": {
+    "description": "Add shopping button"
+  },
+  "accountEqual": "Account equal",
+  "@accountEqual": {
+    "description": "Account equal message"
+  },
+  "sharedExpense": "Shared expense",
+  "@sharedExpense": {
+    "description": "Shared expense label"
+  },
+  "owesYou": "owes you",
+  "@owesYou": {
+    "description": "Friend owes you message"
+  },
+  "youOwe": "You owe {friendName}",
+  "@youOwe": {
+    "description": "You owe friend message",
+    "placeholders": {
+      "friendName": {
+        "type": "String"
+      }
+    }
+  },
+  "searchingUser": "Searching user...",
+  "@searchingUser": {
+    "description": "Searching user message"
+  },
+  "change": "Change",
+  "@change": {
+    "description": "Change button"
+  },
+  "dataLoadingError": "Data loading error",
+  "@dataLoadingError": {
+    "description": "Data loading error message"
+  },
+  "day": "Day (1-31)",
+  "@day": {
+    "description": "Day label"
+  },
+  "dayHint": "Ex: 15",
+  "@dayHint": {
+    "description": "Day hint"
+  },
+  "budget": "Budget (₺)",
+  "@budget": {
+    "description": "Budget label"
+  },
+  "budgetHint": "Ex: 5000.00",
+  "@budgetHint": {
+    "description": "Budget hint"
+  },
+  "addFirstFriend": "Add Your First Friend",
+  "@addFirstFriend": {
+    "description": "Add first friend button"
+  },
+  "friendId": "Friend ID",
+  "@friendId": {
+    "description": "Friend ID label"
+  },
+  "friendIdHint": "Ex: ahmet",
+  "@friendIdHint": {
+    "description": "Friend ID hint"
+  },
+  "amount": "Amount (₺)",
+  "@amount": {
+    "description": "Amount label"
+  },
+  "amountHint": "Ex: 250.00",
+  "@amountHint": {
+    "description": "Amount hint"
+  },
+  "paymentAmount": "Payment Amount (₺)",
+  "@paymentAmount": {
+    "description": "Payment amount label"
+  },
+  "paymentAmountHint": "Ex: 100.00",
+  "@paymentAmountHint": {
+    "description": "Payment amount hint"
+  },
+  "note": "Note (optional)",
+  "@note": {
+    "description": "Note label"
+  },
+  "noteHint": "Ex: Cash payment",
+  "@noteHint": {
+    "description": "Note hint"
+  },
+  "addFirstExpense": "Add First Expense",
+  "@addFirstExpense": {
+    "description": "Add first expense button"
+  },
+  "amountLabel": "Amount",
+  "@amountLabel": {
+    "description": "Amount label"
+  },
+  "expenseNote": "Note (optional)",
+  "@expenseNote": {
+    "description": "Expense note label"
+  },
+  "expenseNoteHint": "Add a note about the expense...",
+  "@expenseNoteHint": {
+    "description": "Expense note hint"
   }
 }
 
