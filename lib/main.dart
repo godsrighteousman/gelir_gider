@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/push_notification_service.dart';
+import 'services/onesignal_service.dart';
+import 'services/auto_push_service.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -1078,6 +1083,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
@@ -1091,14 +1097,14 @@ class _MainTabScreenState extends State<MainTabScreen> {
           });
         },
         type: BottomNavigationBarType.fixed,
-        items: const [
+        items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            label: 'Ana Sayfa',
+            label: l10n.home,
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people),
-            label: 'Friends',
+            label: l10n.friends,
           ),
         ],
       ),
@@ -1472,6 +1478,9 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       _expenses.add(expense);
     });
 
+    // Firebase'e hemen kaydet
+    await _saveExpenseToFirebase(expense);
+
     // SnackBar'ı hemen göster
     if (mounted) {
       try {
@@ -1490,9 +1499,8 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
       }
     }
 
-    // Arka planda kaydetme işlemlerini yap
-    final l10n = AppLocalizations.of(context)!;
-    _saveExpenseInBackground(expense, l10n);
+    // Local storage'a da kaydet
+    await _saveExpenses();
   }
 
   // Arka planda harcama kaydetme
@@ -2680,6 +2688,7 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
@@ -2690,19 +2699,30 @@ class _ExpenseHomePageState extends State<ExpenseHomePage> {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -3253,7 +3273,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
     final l10n = AppLocalizations.of(context)!;
 
     if (netDebt > 0) {
-      return '${friend.fullName} size ${netDebt.toStringAsFixed(0)}₺ borçlu';
+      return '${friend.fullName} ${l10n.owesYou} ${netDebt.toStringAsFixed(0)}₺';
     } else if (netDebt < 0) {
       return '${l10n.youOweText} ${friend.fullName} ${netDebt.abs().toStringAsFixed(0)}₺';
     } else {
@@ -3400,7 +3420,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
             ),
             child: IconButton(
               icon: const Icon(Icons.person_add, color: Colors.white),
-              tooltip: 'Arkadaş Ekle',
+              tooltip: l10n.addFriend,
               onPressed: () => _showAddFriendDialog(),
             ),
           ),
@@ -3415,7 +3435,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
               children: [
                 Expanded(
                   child: _buildStatCard(
-                    'Toplam Arkadaş',
+                    l10n.totalFriends,
                     '${_friends.length}',
                     Icons.people,
                     Colors.blue,
@@ -3424,7 +3444,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    'Toplam Alacak',
+                    l10n.totalCredit,
                     '₺${_friends.fold(0.0, (sum, f) => sum + _calculateNetDebtFor(f).clamp(0.0, double.infinity)).toStringAsFixed(0)}',
                     Icons.account_balance_wallet,
                     Colors.green,
@@ -3433,7 +3453,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    'Toplam Borç',
+                    l10n.totalDebt,
                     '₺${_friends.fold(0.0, (sum, f) => sum + _calculateNetDebtFor(f).clamp(double.negativeInfinity, 0.0).abs()).toStringAsFixed(0)}',
                     Icons.account_balance_wallet,
                     Colors.red,
@@ -3452,7 +3472,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
                     itemCount: _friends.length,
                     itemBuilder: (context, index) {
                       final friend = _friends[index];
-                      return _buildFriendCard(friend, index);
+                      return _buildFriendCard(friend, index, context);
                     },
                   ),
           ),
@@ -3477,6 +3497,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
@@ -3487,19 +3508,30 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -3507,7 +3539,8 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
     );
   }
 
-  Widget _buildFriendCard(Friend friend, int index) {
+  Widget _buildFriendCard(Friend friend, int index, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final netDebt = _calculateNetDebtFor(friend);
     final totalExpenseCount = _getTotalExpenseCountFor(friend);
     final isOwed = netDebt > 0; // Pozitif ise arkadaşım bana borçlu
@@ -3553,10 +3586,10 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
                   const SizedBox(height: 4),
                   Text(
                     isOwed
-                        ? '${friend.displayName} sana borçlu'
+                        ? '${friend.displayName} ${l10n.owesYou}'
                         : isDebtor
-                            ? 'Sen ${friend.displayName}\'a borçlusun'
-                            : 'Eşit durumda',
+                            ? '${l10n.youOweText} ${friend.displayName}'
+                            : l10n.accountsEqual,
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey[600],
@@ -3693,7 +3726,7 @@ class _FriendsPageState extends State<FriendsPage> with RouteAware {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '$totalExpenseCount toplam alışveriş',
+                                '$totalExpenseCount ${l10n.totalShopping}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[600],
@@ -4501,6 +4534,15 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
       // Net durumu güncelle
       await _updateNetBalance(expense);
+
+      // Otomatik push notification gönder
+      await AutoPushService.sendSharedExpenseNotification(
+        expenseDescription: expense.description,
+        amount: expense.amount,
+        createdByName: finalCreatedByName,
+        targetUserId: friendId, // Karşı tarafın kullanıcı ID'si
+        targetUserName: widget.friend.displayName,
+      );
 
       print(
           '✅ Harcama Firebase\'e kaydedildi (tek kayıt): ${expense.description} - ${expense.amount}₺ - ${expense.createdByName} - Kategori: $finalCategory - Firebase\'e gönderilen kategori: "$finalCategory"');
@@ -5451,7 +5493,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             ),
           ),
 
-          // Alışveriş geçmişi
+          // Shopping history
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -5493,7 +5535,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                             itemCount: _sharedExpenses.length,
                             itemBuilder: (context, index) {
                               final expense = _sharedExpenses[index];
-                              return _buildExpenseCard(expense, index);
+                              return _buildExpenseCard(expense, index, context);
                             },
                           ),
                   ),
@@ -5561,7 +5603,9 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     );
   }
 
-  Widget _buildExpenseCard(SharedExpense expense, int index) {
+  Widget _buildExpenseCard(
+      SharedExpense expense, int index, BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isPayment = expense.debtType == 'payment';
     final isFullDebt = expense.debtType == 'full';
     final currentUserId = _userProvider.currentUser?.id ?? '';
@@ -5660,7 +5704,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      isFullDebt ? 'Hepsini yansıt' : 'Yarısını yansıt',
+                      isFullDebt ? l10n.fullAmount : l10n.halfAmount,
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -5850,9 +5894,9 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Yeni Harcama Ekle',
+                      l10n.addNewExpense,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -5962,8 +6006,8 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Tarih',
+                                Text(
+                                  l10n.date,
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -6036,22 +6080,21 @@ class _ExpenseAddDialogState extends State<ExpenseAddDialog> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               if (_formKey.currentState!.validate()) {
                                 final amount = double.parse(_amountController
                                     .text
                                     .replaceAll(',', '.'));
-                                Navigator.pop(
-                                  context,
-                                  Expense(
-                                    amount: amount,
-                                    category: _category,
-                                    date: _date,
-                                    note: _noteController.text.trim().isEmpty
-                                        ? null
-                                        : _noteController.text.trim(),
-                                  ),
+                                final expense = Expense(
+                                  amount: amount,
+                                  category: _category,
+                                  date: _date,
+                                  note: _noteController.text.trim().isEmpty
+                                      ? null
+                                      : _noteController.text.trim(),
                                 );
+
+                                Navigator.pop(context, expense);
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -6702,6 +6745,13 @@ class IntroSlide {
   });
 }
 
+// Background message handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await PushNotificationService.backgroundMessageHandler(message);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -6713,6 +6763,42 @@ void main() async {
     );
     print('✅ Firebase başarıyla başlatıldı!');
     firebaseInitialized = true;
+
+    // Push notification setup
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    PushNotificationService.setupForegroundMessageHandler();
+    PushNotificationService.setupNotificationTapHandler();
+
+    // OneSignal başlatma
+    await OneSignalService.initialize('04de4d00-21ea-429c-9f53-3138e15732c7');
+    OneSignalService.setupNotificationTapHandler();
+    OneSignalService.setupForegroundHandler();
+
+    // OneSignal Player ID'yi Firebase'e kaydet
+    final playerId = OneSignalService.getPlayerId();
+    if (playerId != null) {
+      // Kullanıcı giriş yaptıktan sonra Player ID'yi kaydet
+      // Bu kısım kullanıcı giriş yaptığında çağrılacak
+    }
+
+    // APNs token'ı bekle ve FCM Token'ı al
+    try {
+      // iOS'ta APNs token'ının hazır olmasını bekle
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await Future.delayed(Duration(seconds: 3));
+      }
+
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('🔔 FCM Token: $token');
+      } else {
+        print('❌ FCM Token null döndü');
+      }
+    } catch (e) {
+      print('❌ FCM Token alınamadı: $e');
+    }
+
+    print('✅ Push notification servisi başlatıldı!');
 
     // Firebase bağlantısını test et
     try {
